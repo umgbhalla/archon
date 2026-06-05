@@ -63,6 +63,7 @@ export interface Session {
 
   /** /loop session? If true the row is sleeping between iterations (✢). */
   isLoop: boolean
+  isShell?: boolean // dispatched via `! <cmd>` — a background shell job, not a model session
   loopRun?: number // current run count, e.g. 12
   countdown?: string // time until next iteration, e.g. "in 4m"
 

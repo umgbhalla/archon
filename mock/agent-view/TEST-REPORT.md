@@ -36,3 +36,18 @@ set in `buildRenderGroups` (`a:<agent>`, `s:<state>` incl. `s:blocked`→needsIn
 
 ## Verdict
 State machine + rendering verified end-to-end in a real terminal. One real bug (filter) fixed.
+
+## Gaps closed (follow-up pass)
+- **Selection drift bug fixed** — selection now tracks the session by stable key
+  (`keepSelection`/`selectionKey`), so pin/regroup/delete/scenario keep the same row
+  selected. Rename/delete no longer hit the wrong row. Regression test included.
+- **Real reorder** — `Shift+↑/↓` now swaps row order within the group (was a no-op move).
+- **`! <cmd>` shell jobs** — dispatching `!pytest -x` creates a shell-job row (agent `shell`,
+  `$ cmd` summary), exempt from the 4-char minimum.
+- **`Ctrl+O` transcript mode** — toggles a full role-tagged transcript view while attached.
+- **`Alt+1..9`** — quick-attach to the Nth row.
+- **`Ctrl+L`** — light/dark theme toggle (palettes already in theme.ts).
+- **Onboarding** — empty roster renders the onboarding hint + example prompts.
+- **Tests** — `bun test` (`src/state/store.test.ts`): 15 reducer/selection/lifecycle tests, all pass.
+
+Run tests: `cd app && bun test`.

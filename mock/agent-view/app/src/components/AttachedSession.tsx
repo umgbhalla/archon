@@ -24,6 +24,8 @@ export interface AttachedSessionProps {
   session: Session
   width: number
   height: number
+  /** Ctrl+O transcript view: hide the recap, show the full role-tagged log. */
+  transcriptMode?: boolean
 }
 
 type Role = TranscriptEntry["role"]
@@ -70,7 +72,7 @@ const fmtTime = (t: number): string => {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
 }
 
-export function AttachedSession({ session, width, height }: AttachedSessionProps) {
+export function AttachedSession({ session, width, height, transcriptMode = false }: AttachedSessionProps) {
   const c = theme.colors
   const icon = iconForShape({
     processAlive: session.processAlive,
@@ -122,18 +124,25 @@ export function AttachedSession({ session, width, height }: AttachedSessionProps
 
       <text fg={c.separator} wrapMode="none">{rule}</text>
 
-      {/* Recap block */}
-      <box flexDirection="column" marginTop={1}>
-        <text fg={c.fgDim} attributes={TextAttributes.BOLD} wrapMode="none">
-          Recap — while you were away
-        </text>
-        {recapLines.map((line, i) => (
-          <text key={`recap-${i}`} wrapMode="none">
-            <span fg={c.claude}>{"    · "}</span>
-            <span fg={c.fg}>{line}</span>
+      {/* Recap block (hidden in transcript mode) */}
+      {transcriptMode ? (
+        <box marginTop={1}>
+          <text fg={c.claude} attributes={TextAttributes.BOLD} wrapMode="none">{"⊟ TRANSCRIPT"}</text>
+          <text fg={c.fgDim} wrapMode="none">{"  · Ctrl+O to return to the session view"}</text>
+        </box>
+      ) : (
+        <box flexDirection="column" marginTop={1}>
+          <text fg={c.fgDim} attributes={TextAttributes.BOLD} wrapMode="none">
+            Recap — while you were away
           </text>
-        ))}
-      </box>
+          {recapLines.map((line, i) => (
+            <text key={`recap-${i}`} wrapMode="none">
+              <span fg={c.claude}>{"    · "}</span>
+              <span fg={c.fg}>{line}</span>
+            </text>
+          ))}
+        </box>
+      )}
 
       {/* Transcript replay (scrolled to the tail) */}
       <box flexDirection="column" marginTop={1} flexGrow={1}>

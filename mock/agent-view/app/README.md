@@ -164,3 +164,7 @@ The reducer in `src/state/store.ts` applies them.
   is no key bound to switch themes at runtime.
 - **Piped/headless key input** is not honored — OpenTUI needs a real TTY, so automated
   key-sequence smoke tests only confirm a clean start + exit, not scripted navigation.
+
+## Test
+
+`bun test` runs the reducer/state-machine suite (`src/state/store.test.ts`).

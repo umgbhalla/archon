@@ -15,7 +15,7 @@ import { useCallback, useReducer } from "react"
 import { seedSessions } from "../data/seed"
 import { scenarioEvents } from "../data/scenario"
 import type { Session, SessionGroup, SessionState } from "../data/types"
-import { GROUP_ORDER } from "../theme/theme"
+import { GROUP_ORDER, setThemeMode } from "../theme/theme"
 
 // ───────────────────────── UI modes (Part B.1) ─────────────────────────
 
@@ -76,6 +76,10 @@ export interface AppState {
   hud: string
   /** When attached, the session id we're attached to. */
   attachedId: string | null
+  /** Ctrl+O transcript view inside the attached session. */
+  transcriptMode: boolean
+  /** Active theme palette (Ctrl+L toggles). */
+  themeMode: "light" | "dark"
   /** Whether the app has requested exit-to-shell. */
   exited: boolean
 }
@@ -275,6 +279,28 @@ export function sessionById(state: AppState, id: string | null): Session | undef
   return state.sessions.find((s) => s.id === id)
 }
 
+/** Stable key for a selectable: survives reordering/regrouping. */
+export function selectionKey(state: AppState): string {
+  const sel = selectedSelectable(state)
+  if (!sel) return ""
+  return sel.kind === "row" ? `row:${sel.sessionId}` : `header:${sel.group}`
+}
+
+function keyForSelectable(sel: Selectable): string {
+  return sel.kind === "row" ? `row:${sel.sessionId}` : `header:${sel.group}`
+}
+
+/** Re-point `next.selectedIndex` at whatever selectable `prev` had selected,
+ *  by stable key — so pinning/regrouping/deleting never silently moves the
+ *  selection onto a different row. Falls back to the nearest position. */
+function keepSelection(prev: AppState, next: AppState): AppState {
+  const key = selectionKey(prev)
+  const list = buildSelectables(next)
+  let idx = list.findIndex((s) => keyForSelectable(s) === key)
+  if (idx < 0) idx = Math.max(0, Math.min(prev.selectedIndex, Math.max(0, list.length - 1)))
+  return { ...next, selectedIndex: idx }
+}
+
 // ─────────────────────── Part B: high-level FSM actions ───────────────────────
 // The keymap (state/keymap.ts) translates raw key events into these actions.
 
@@ -304,6 +330,9 @@ export type FsmAction =
   | { type: "dispatchAndAttach" } // Shift+Enter
   | { type: "sendReply" } // Enter in peek when reply present
   | { type: "scenarioStep" } // `n` — advance the scripted timeline by one event
+  | { type: "attachIndex"; n: number } // Alt+1..9 quick-attach
+  | { type: "transcriptToggle" } // Ctrl+O in attached
+  | { type: "themeToggle" } // Ctrl+L light/dark
   | { type: "exit" } // Esc to shell
 
 // ───────────────────────── Initial state ─────────────────────────
@@ -325,6 +354,8 @@ export function initialState(): AppState {
     scenarioCursor: 0,
     hud: "ready · press n to advance scenario · ? for shortcuts",
     attachedId: null,
+    transcriptMode: false,
+    themeMode: "dark",
     exited: false,
   }
 }
@@ -345,21 +376,24 @@ function withInput(state: AppState, text: string): AppState {
 
 function makeDispatchedSession(text: string): Session {
   const short = Math.random().toString(16).slice(2, 10)
+  const isShell = text.startsWith("!")
+  const cmd = isShell ? text.slice(1).trim() : text
   return {
     id: `${short}-dispatched`,
     shortId: short,
-    name: text.slice(0, 28).trim() || "new session",
-    agent: "default",
+    name: isShell ? `! ${cmd}`.slice(0, 28).trim() : text.slice(0, 28).trim() || "new session",
+    agent: isShell ? "shell" : "default",
     cwd: "~/games/clawd-jumps",
     state: "working",
     processAlive: true,
     isLoop: false,
-    summary: text,
+    isShell,
+    summary: isShell ? `$ ${cmd}` : text,
     lastChangedAgo: "now",
     pinned: false,
     group: "working",
-    peekOutput: [`Dispatched: ${text}`],
-    transcript: [{ role: "user", t: 0, text }],
+    peekOutput: isShell ? [`$ ${cmd}`, "running as a background shell job…"] : [`Dispatched: ${text}`],
+    transcript: [{ role: isShell ? "tool" : "user", t: 0, text: isShell ? `$ ${cmd}` : text }],
   }
 }
 
@@ -369,8 +403,20 @@ export function reducer(state: AppState, action: FsmAction): AppState {
     case "moveSelection":
       return { ...state, selectedIndex: clampIndex(state, state.selectedIndex + action.delta) }
     case "reorderSelection": {
-      // Mock: reorder simply moves selection; real reorder would shuffle rows.
-      return { ...state, selectedIndex: clampIndex(state, state.selectedIndex + action.delta), hud: "reorder (mock: moves selection)" }
+      const s = selectedSession(state)
+      if (!s) return { ...state, selectedIndex: clampIndex(state, state.selectedIndex + action.delta) }
+      const list = buildSelectables(state)
+      const curIdx = list.findIndex((x) => x.kind === "row" && x.sessionId === s.id)
+      if (curIdx < 0) return state
+      let j = curIdx + action.delta
+      while (j >= 0 && j < list.length && list[j]!.kind !== "row") j += action.delta
+      const target = list[j]
+      if (!target || target.kind !== "row" || target.group !== list[curIdx]!.group) return state // can't reorder across groups
+      const sessions = [...state.sessions]
+      const si = sessions.findIndex((x) => x.id === s.id)
+      const ti = sessions.findIndex((x) => x.id === target.sessionId)
+      ;[sessions[si], sessions[ti]] = [sessions[ti]!, sessions[si]!]
+      return keepSelection(state, { ...state, sessions, hud: `reordered "${s.name}"` })
     }
 
     // ── peek ──
@@ -395,7 +441,7 @@ export function reducer(state: AppState, action: FsmAction): AppState {
       const s = selectedSession(state)
       if (!s) return state
       const sessions = applySessionEvent(state.sessions, { type: "answer", id: s.id })
-      return { ...state, sessions, hud: `picked option ${action.n} for "${s.name}"`, replyBuffer: "" }
+      return keepSelection(state, { ...state, sessions, hud: `picked option ${action.n} for "${s.name}"`, replyBuffer: "" })
     }
     case "suggestReply": {
       const s = selectedSession(state)
@@ -406,7 +452,7 @@ export function reducer(state: AppState, action: FsmAction): AppState {
       const s = selectedSession(state)
       if (!s || state.replyBuffer.trim().length === 0) return state
       const sessions = applySessionEvent(state.sessions, { type: "answer", id: s.id })
-      return { ...state, sessions, replyBuffer: "", hud: `replied to "${s.name}"` }
+      return keepSelection(state, { ...state, sessions, replyBuffer: "", hud: `replied to "${s.name}"` })
     }
 
     // ── attach / detach ──
@@ -421,7 +467,29 @@ export function reducer(state: AppState, action: FsmAction): AppState {
       return { ...state, sessions, prevMode: "tableView", mode: "attachedSession", attachedId: s.id, replyBuffer: "" }
     }
     case "detach":
-      return { ...state, mode: "tableView", attachedId: null }
+      return { ...state, mode: "tableView", attachedId: null, transcriptMode: false }
+    case "attachIndex": {
+      const rows = buildSelectables(state).filter((x) => x.kind === "row")
+      const target = rows[action.n - 1]
+      if (!target || target.kind !== "row") return state
+      const s = state.sessions.find((x) => x.id === target.sessionId)
+      if (!s) return state
+      let sessions = state.sessions
+      if (!s.processAlive || s.state === "failed") {
+        sessions = applySessionEvent(sessions, s.state === "failed" ? { type: "respawn", id: s.id } : { type: "procRestart", id: s.id })
+      }
+      const all = buildSelectables(state)
+      const idx = all.findIndex((x) => x.kind === "row" && x.sessionId === s.id)
+      return { ...state, sessions, selectedIndex: idx >= 0 ? idx : state.selectedIndex, prevMode: "tableView", mode: "attachedSession", attachedId: s.id, hud: `attached to ${action.n}` }
+    }
+    case "transcriptToggle":
+      if (state.mode !== "attachedSession") return state
+      return { ...state, transcriptMode: !state.transcriptMode }
+    case "themeToggle": {
+      const themeMode = state.themeMode === "dark" ? "light" : "dark"
+      setThemeMode(themeMode)
+      return { ...state, themeMode, hud: `theme: ${themeMode}` }
+    }
 
     // ── overlays / layered back ──
     case "back": {
@@ -481,12 +549,11 @@ export function reducer(state: AppState, action: FsmAction): AppState {
     case "deleteConfirm": {
       if (state.deleteArmedGroup) {
         const sessions = applySessionEvent(state.sessions, { type: "deleteGroup", group: state.deleteArmedGroup })
-        return { ...state, sessions, mode: "tableView", deleteArmedGroup: null, selectedIndex: clampIndex({ ...state, sessions }, state.selectedIndex), hud: "group deleted" }
+        return keepSelection(state, { ...state, sessions, mode: "tableView", deleteArmedGroup: null, hud: "group deleted" })
       }
       if (state.deleteArmedId) {
         const sessions = applySessionEvent(state.sessions, { type: "delete", id: state.deleteArmedId })
-        const next = { ...state, sessions, mode: "tableView" as UiMode, deleteArmedId: null }
-        return { ...next, selectedIndex: clampIndex(next, state.selectedIndex), hud: "session deleted" }
+        return keepSelection(state, { ...state, sessions, mode: "tableView" as UiMode, deleteArmedId: null, hud: "session deleted" })
       }
       return { ...state, mode: "tableView" }
     }
@@ -500,15 +567,14 @@ export function reducer(state: AppState, action: FsmAction): AppState {
       const s = selectedSession(state)
       if (!s) return state
       const sessions = applySessionEvent(state.sessions, { type: "pin", id: s.id })
-      return { ...state, sessions, hud: s.pinned ? `unpinned "${s.name}"` : `pinned "${s.name}"` }
+      return keepSelection(state, { ...state, sessions, hud: s.pinned ? `unpinned "${s.name}"` : `pinned "${s.name}"` })
     }
     case "headerToggle": {
       const sel = selectedSelectable(state)
       if (!sel || sel.kind !== "header") return state
       const collapsed = state.collapsedGroups.includes(sel.group)
       const collapsedGroups = collapsed ? state.collapsedGroups.filter((g) => g !== sel.group) : [...state.collapsedGroups, sel.group]
-      const next = { ...state, collapsedGroups }
-      return { ...next, selectedIndex: clampIndex(next, state.selectedIndex) }
+      return keepSelection(state, { ...state, collapsedGroups })
     }
 
     // ── input editing ──
@@ -534,11 +600,13 @@ export function reducer(state: AppState, action: FsmAction): AppState {
         // U7: a filter Enter selects a matching session instead of dispatching.
         return { ...withInput(state, ""), hud: `filter applied: ${text}` }
       }
-      if (text.length < 4) return { ...state, hud: "Too short — describe a task in at least 4 chars" }
+      if (!text.startsWith("!") && text.length < 4) return { ...state, hud: "Too short — describe a task in at least 4 chars" }
       const session = makeDispatchedSession(text)
       const sessions = applySessionEvent(state.sessions, { type: "dispatch", session })
-      const next: AppState = { ...withInput(state, ""), sessions, mode: "tableView", hud: `dispatched "${session.name}"` }
-      return { ...next, selectedIndex: clampIndex(next, 1) }
+      const next: AppState = { ...withInput(state, ""), sessions, mode: "tableView", hud: session.isShell ? `started shell job "${session.name}"` : `dispatched "${session.name}"` }
+      const list = buildSelectables(next)
+      const idx = list.findIndex((x) => x.kind === "row" && x.sessionId === session.id)
+      return { ...next, selectedIndex: idx >= 0 ? idx : clampIndex(next, 1) }
     }
     case "dispatchAndAttach": {
       const text = state.input.text.trim()
@@ -559,8 +627,7 @@ export function reducer(state: AppState, action: FsmAction): AppState {
       if (ev.appendTranscript) {
         sessions = sessions.map((s) => (s.id === ev.sessionId ? { ...s, transcript: [...s.transcript, ev.appendTranscript!] } : s))
       }
-      const next = { ...state, sessions, scenarioCursor: state.scenarioCursor + 1, hud: `[${state.scenarioCursor + 1}/${scenarioEvents.length}] ${ev.label}` }
-      return { ...next, selectedIndex: clampIndex(next, state.selectedIndex) }
+      return keepSelection(state, { ...state, sessions, scenarioCursor: state.scenarioCursor + 1, hud: `[${state.scenarioCursor + 1}/${scenarioEvents.length}] ${ev.label}` })
     }
 
     default:

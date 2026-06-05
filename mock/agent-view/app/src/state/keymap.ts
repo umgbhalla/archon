@@ -38,6 +38,7 @@ export function keyToAction(key: KeyEvent, state: AppState): FsmAction | null {
   if (mode === "attachedSession") {
     if (name === "left") return { type: "detach" } // U18
     if (name === "escape") return { type: "exit" } // U21 — to shell
+    if (key.ctrl && name === "o") return { type: "transcriptToggle" } // Ctrl+O transcript mode
     if (key.ctrl && name === "z") return { type: "detach" } // U19
     if (key.ctrl && name === "c") return { type: "detach" } // U20 (mock: single press detaches)
     return null
@@ -89,6 +90,8 @@ export function keyToAction(key: KeyEvent, state: AppState): FsmAction | null {
   const hasInput = state.input.text.length > 0
 
   // Global table-mode chords (work regardless of input contents) ──
+  if (key.meta && key.sequence && DIGITS.has(key.sequence)) return { type: "attachIndex", n: Number(key.sequence) } // Alt+1..9 (U17)
+  if (key.ctrl && name === "l") return { type: "themeToggle" } // Ctrl+L light/dark
   if (key.ctrl && name === "r") return { type: "renameStart" } // U24
   if (key.ctrl && name === "x") return { type: "deleteArm" } // U27 / U30
   if (key.ctrl && name === "s") return { type: "groupToggleAxis" } // U32

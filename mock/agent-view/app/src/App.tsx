@@ -11,6 +11,7 @@ import { useEffect, useRef } from "react"
 import { AttachedSession } from "./components/AttachedSession"
 import { DeleteConfirm } from "./components/DeleteConfirm"
 import { HelpOverlay } from "./components/HelpOverlay"
+import { Onboarding } from "./components/Onboarding"
 import { PeekPanel } from "./components/PeekPanel"
 import { RenameInput } from "./components/RenameInput"
 import { scenarioEvents } from "./data/scenario"
@@ -24,7 +25,7 @@ import {
   sessionById,
   useStore,
 } from "./state/store"
-import { colorForPr, colorForState, GROUP_TITLES, iconForShape, theme } from "./theme/theme"
+import { colorForPr, colorForState, GROUP_TITLES, iconForShape, setThemeMode, theme } from "./theme/theme"
 
 // ───────────────────────── Header ─────────────────────────
 
@@ -98,8 +99,9 @@ export function App() {
   const c = theme.colors
 
   useEffect(() => {
+    setThemeMode(state.themeMode)
     renderer.setBackgroundColor(c.bg)
-  }, [renderer, c.bg])
+  }, [renderer, c.bg, state.themeMode])
 
   // Single timer in the whole app: the 2s deleteConfirm arm window (U29).
   const disarmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -133,14 +135,17 @@ export function App() {
   // Fullscreen replacement: attached session.
   if (state.mode === "attachedSession") {
     const attached = sessionById(state, state.attachedId)
-    if (attached) return <AttachedSession session={attached} width={width} height={height} />
+    if (attached) return <AttachedSession session={attached} width={width} height={height} transcriptMode={state.transcriptMode} />
   }
 
   return (
     <box width={width} height={height} flexDirection="column" backgroundColor={c.bg}>
       <Header sessions={state.sessions} />
 
-      {/* Group sections */}
+      {/* Onboarding (empty roster) or the grouped session list */}
+      {state.mode === "onboardingEmpty" || state.sessions.length === 0 ? (
+        <Onboarding width={width} height={height} />
+      ) : (
       <box flexDirection="column" paddingTop={1} flexGrow={1}>
         {renderGroups.map((rg) => {
           const headerSelected = sel?.kind === "header" && sel.group === rg.group
@@ -165,6 +170,8 @@ export function App() {
         })}
       </box>
 
+)}
+
       {/* Dispatch input bracketed by dim rules */}
       <box flexDirection="column" paddingLeft={2}>
         <text fg={c.separator}>{"─".repeat(Math.max(1, width - 4))}</text>
@@ -181,7 +188,7 @@ export function App() {
 
       {/* Footer hints + demo HUD */}
       <box flexDirection="column" paddingLeft={2}>
-        <text fg={c.fgDim}>enter to open · space to reply · ctrl+x to delete · n next scenario · ? for shortcuts</text>
+        <text fg={c.fgDim}>space peek · enter attach · ctrl+t pin · ctrl+r rename · ctrl+x delete · ctrl+s group · ctrl+l theme · n scenario · ? help</text>
         <text>
           <span fg={c.claude}>{"hud "}</span>
           <span fg={c.fgDim}>{`${state.hud}  (${state.scenarioCursor}/${scenarioEvents.length})`}</span>
