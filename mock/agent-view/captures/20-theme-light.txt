@@ -1,0 +1,44 @@
+
+  ▟▙  Claude Code v2.1.140
+  ▜▛  Opus 4.7 (1M context) · /Users/jane/code/web-app
+      3 awaiting input · 6 working · 3 completed
+
+  Pinned
+    ✽ clawd walk cycle         Write assets/sprites/clawd-walk.png                                                   3
+    ✻ design doc keeper        Idle — ready for your next prompt                                                    22
+
+  Ready for review
+    ∙ jump physics             Opened PR with collision fix                                             PR #2048    2h
+    ∙ checkpoint save system   3 PRs open — save/load, autosave, slot UI                                PR #2051    5h
+
+  Needs input
+    ✻ power-up design          needs input: double jump or wall climb?                                               1
+    ✻ leaderboard backend      needs input: allow writing .env.production?                                           4
+    ✻ enemy AI patrols         needs input: how aggressive should patrol enemies be?                                no
+
+  Working
+    ✽ collision detection      Bash npm test -- physics                                                             no
+    ✽ tileset import           3/5 importing biome tilesets                                                         no
+    ✢ playtest level 3         run 12 · all checkpoints cleared                                                   in 4
+    ✽ investigate the flaky c… investigate the flaky checkout test                                                  no
+    ✽ ! pytest -x physics      $ pytest -x physics                                                                  no
+
+  Completed
+    ∙ water shader             error: GLSL compile failed (line 42)                                                  1
+    ∙ sound effects            result: 14 SFX exported to assets/audio                                               4
+    … 1 more
+
+
+
+
+
+
+
+
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ❯ describe a task for a new session
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  space peek · enter attach · ctrl+t pin · ctrl+r rename · ctrl+x delete · ctrl+s group · ctrl+l theme · n scenario · ?
+  help
+  hud theme: light  (3/10)

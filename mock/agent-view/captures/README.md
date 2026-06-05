@@ -29,5 +29,9 @@ not raced live `show` calls.
 | 15-deleted | row removed | `Ctrl+X` again |
 | 16-scenario | scripted scenario stepped | `n` |
 | 17-narrow / 18-wide | responsive reflow | `resize` |
+| 19-bashjob | shell job dispatched (`! pytest -x`) | type `!…` |
+| 20-theme-light | light/dark theme toggle | `Ctrl+L` |
+| 21-transcript | transcript mode in attached view | `Ctrl+O` |
+| 22-reorder | reorder rows within a group | `Shift+↑/↓` |
 
 Re-export the video: `termctrl video demo.termctrl --edit demo-edit.json --footer --hide-cursor --out agent-view-demo.mp4`.
