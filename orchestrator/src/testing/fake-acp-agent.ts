@@ -8,6 +8,12 @@
  *  - session/new -> returns a generated sessionId.
  *  - session/prompt -> emits 3 agent_message_chunk notifications, then returns
  *    { stopReason: "end_turn" }.
+ *  - session/prompt with a prompt CONTAINING "edit" -> first emits a thought chunk +
+ *    a tool_call (pending) update, then calls session/request_permission and BLOCKS;
+ *    once the client selects an option it emits a tool_call_update (completed) and
+ *    the normal reply chunks. If the client cancels (or session/cancel arrives) it
+ *    returns { stopReason: "cancelled" }. This drives the interactive flow with no
+ *    real model.
  *  - session/cancel -> sets a flag so an in-flight prompt returns "cancelled".
  *
  * Lets us test the client end-to-end with no external credentials.
@@ -35,6 +41,14 @@ import type {
 /** The reply chunks the fake agent streams for any prompt. */
 export const FAKE_CHUNKS = ["Hello", " from", " the fake ACP agent!"] as const;
 export const FAKE_REPLY = FAKE_CHUNKS.join("");
+
+/** A prompt containing this word triggers the interactive tool-call + permission flow. */
+export const FAKE_EDIT_TRIGGER = "edit";
+/** The tool-call id + permission option ids the fake agent uses (deterministic). */
+export const FAKE_TOOL_CALL_ID = "fake-tool-1";
+export const FAKE_TOOL_TITLE = "Edit src/example.txt";
+export const FAKE_ALLOW_OPTION = "allow";
+export const FAKE_REJECT_OPTION = "reject";
 
 class FakeAgent implements Agent {
   private cancelled = new Set<string>();
@@ -66,6 +80,18 @@ class FakeAgent implements Agent {
   async prompt(params: PromptRequest): Promise<PromptResponse> {
     const { sessionId } = params;
     this.cancelled.delete(sessionId);
+
+    // Detect the interactive trigger from the prompt text content blocks.
+    const promptText = (params.prompt ?? [])
+      .map((b) => (b.type === "text" ? b.text : ""))
+      .join(" ")
+      .toLowerCase();
+
+    if (promptText.includes(FAKE_EDIT_TRIGGER)) {
+      const cancelled = await this.runInteractiveEdit(sessionId);
+      if (cancelled) return { stopReason: "cancelled" };
+    }
+
     for (const text of FAKE_CHUNKS) {
       if (this.cancelled.has(sessionId)) {
         return { stopReason: "cancelled" };
@@ -81,6 +107,62 @@ class FakeAgent implements Agent {
       await new Promise((r) => setTimeout(r, 1));
     }
     return { stopReason: "end_turn" };
+  }
+
+  /**
+   * The interactive edit flow: thought chunk -> pending tool_call -> request
+   * permission (BLOCKS) -> on allow, tool_call_update completed; on reject/cancel,
+   * tool_call_update failed. Returns true if the turn was cancelled.
+   */
+  private async runInteractiveEdit(sessionId: string): Promise<boolean> {
+    await this.conn.sessionUpdate({
+      sessionId,
+      update: {
+        sessionUpdate: "agent_thought_chunk",
+        content: { type: "text", text: "I should edit the file." },
+      },
+    });
+    await this.conn.sessionUpdate({
+      sessionId,
+      update: {
+        sessionUpdate: "tool_call",
+        toolCallId: FAKE_TOOL_CALL_ID,
+        title: FAKE_TOOL_TITLE,
+        kind: "edit",
+        status: "pending",
+      },
+    });
+
+    const res = await this.conn.requestPermission({
+      sessionId,
+      toolCall: {
+        toolCallId: FAKE_TOOL_CALL_ID,
+        title: FAKE_TOOL_TITLE,
+        kind: "edit",
+      },
+      options: [
+        { optionId: FAKE_ALLOW_OPTION, name: "Allow", kind: "allow_once" },
+        { optionId: FAKE_REJECT_OPTION, name: "Reject", kind: "reject_once" },
+      ],
+    });
+
+    const outcome = res.outcome;
+    const allowed =
+      outcome.outcome === "selected" && outcome.optionId === FAKE_ALLOW_OPTION;
+
+    await this.conn.sessionUpdate({
+      sessionId,
+      update: {
+        sessionUpdate: "tool_call_update",
+        toolCallId: FAKE_TOOL_CALL_ID,
+        status: allowed ? "completed" : "failed",
+      },
+    });
+
+    if (outcome.outcome === "cancelled" || this.cancelled.has(sessionId)) {
+      return true;
+    }
+    return false;
   }
 
   async cancel(params: CancelNotification): Promise<void> {

@@ -27,6 +27,8 @@ import {
   type PromptParams,
   type StopParams,
   type LogsParams,
+  type AnswerPermissionParams,
+  type SetInteractiveParams,
 } from "./protocol.ts";
 
 const DAEMON_VERSION = "0.1.0";
@@ -205,6 +207,18 @@ export class DaemonServer {
           this.stream(socket, req.id, { type: "session_created", session: s });
         }
         return { attached: true };
+      }
+
+      case "answerPermission": {
+        const p = req.params as AnswerPermissionParams;
+        this.manager.answerPermission(p.id, p.optionId);
+        return { ok: true };
+      }
+
+      case "setInteractive": {
+        const p = req.params as SetInteractiveParams;
+        this.manager.setInteractive(p.id, p.on);
+        return { ok: true };
       }
 
       case "stop": {

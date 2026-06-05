@@ -41,6 +41,8 @@ export interface UiState {
   dispatch: string;
   /** Attach input buffer (sends a prompt to the attached session). */
   attachInput: string;
+  /** Scrollback offset for the attached ChatView (lines up from the tail; 0 = pinned). */
+  attachScroll: number;
   /** Currently attached session id (mode === "attached"). */
   attachedId: string | null;
   /** Transient status/HUD line. */
@@ -64,6 +66,7 @@ export function initialUiState(): UiState {
     selectionKey: null,
     dispatch: "",
     attachInput: "",
+    attachScroll: 0,
     attachedId: null,
     hud: "ready",
     filterWaiting: false,
@@ -151,6 +154,9 @@ export type UiAction =
   | { type: "attachChar"; ch: string }
   | { type: "attachBackspace" }
   | { type: "attachClear" }
+  | { type: "scrollUp"; lines: number }
+  | { type: "scrollDown"; lines: number }
+  | { type: "scrollReset" }
   | { type: "setHud"; hud: string }
   | { type: "toggleFilter" }
   | { type: "toggleHelp" }
@@ -184,19 +190,20 @@ export function reducer(state: UiState, action: UiAction): UiState {
         mode: "attached",
         attachedId: sess.id,
         attachInput: "",
+        attachScroll: 0,
         deleteArmedId: null,
         hud: `attached ${sess.id}`,
       };
     }
 
     case "detach":
-      return { ...state, mode: "grid", attachedId: null, attachInput: "" };
+      return { ...state, mode: "grid", attachedId: null, attachInput: "", attachScroll: 0 };
 
     case "back":
       // help -> return to underlying mode; attached -> grid; grid w/ input -> clear; else exit.
       if (state.mode === "help") return { ...state, mode: state.helpReturnMode };
       if (state.deleteArmedId) return { ...state, deleteArmedId: null, hud: "delete disarmed" };
-      if (state.mode === "attached") return { ...state, mode: "grid", attachedId: null, attachInput: "" };
+      if (state.mode === "attached") return { ...state, mode: "grid", attachedId: null, attachInput: "", attachScroll: 0 };
       if (state.dispatch.length > 0) return { ...state, dispatch: "" };
       return { ...state, exited: true };
 
@@ -216,6 +223,14 @@ export function reducer(state: UiState, action: UiAction): UiState {
       return { ...state, attachInput: state.attachInput.slice(0, -1) };
     case "attachClear":
       return { ...state, attachInput: "" };
+
+    case "scrollUp":
+      // Lift the window up from the tail; ChatView clamps to the real maxOffset.
+      return { ...state, attachScroll: state.attachScroll + action.lines };
+    case "scrollDown":
+      return { ...state, attachScroll: Math.max(0, state.attachScroll - action.lines) };
+    case "scrollReset":
+      return { ...state, attachScroll: 0 };
 
     case "setHud":
       return { ...state, hud: action.hud };

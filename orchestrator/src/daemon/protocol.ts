@@ -25,6 +25,8 @@ export type DaemonMethod =
   | "createSession"
   | "prompt"
   | "attach"
+  | "answerPermission"
+  | "setInteractive"
   | "stop"
   | "logs"
   | "shutdown";
@@ -100,6 +102,17 @@ export interface PromptParams {
 export interface PromptResult {
   message: string;
   stopReason: string;
+}
+
+export interface AnswerPermissionParams {
+  id: string;
+  /** Chosen optionId, or null to cancel the request. */
+  optionId: string | null;
+}
+
+export interface SetInteractiveParams {
+  id: string;
+  on: boolean;
 }
 
 export interface StopParams {

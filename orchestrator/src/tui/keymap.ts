@@ -66,6 +66,8 @@ export const HELP_SECTIONS: KeySection[] = [
     title: "Attached view",
     rows: [
       ["Enter", "Send the typed prompt to the attached session"],
+      ["PgUp / PgDn", "Scroll back through the transcript"],
+      ["1-9 / ↑↓ / Enter", "Answer a permission prompt (Esc denies)"],
       ["← / Esc / Ctrl+Z", "Detach back to the grid"],
     ].map(([keys, action]) => ({ keys: keys!, action: action! })),
   },
@@ -107,6 +109,9 @@ export function keyToAction(
     if (key.sequence === "?" && state.attachInput.length === 0) return { type: "toggleHelp" };
     if (name === "escape" || name === "left") return { type: "detach" };
     if (key.ctrl && (name === "z" || name === "c")) return { type: "detach" };
+    // Scrollback through the transcript (a page ≈ 10 lines).
+    if (name === "pageup") return { type: "scrollUp", lines: 10 };
+    if (name === "pagedown") return { type: "scrollDown", lines: 10 };
     if (name === "return") return null; // handled by host (async prompt send)
     if (name === "backspace") return { type: "attachBackspace" };
     const ch = printableChar(key);

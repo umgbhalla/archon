@@ -1,0 +1,34 @@
+
+  ▟▙  fake-session-1  fake · /Users/umang/hub/zonko/archon/orchestrator   attached ✻ completed
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+  › edit a file to add a license header
+
+  ✻ I should edit the file.
+
+  ✓ Edit src/example.txt  [completed edit]
+
+  ⏵ Hello from the fake ACP agent!
+
+  › thanks, now summarize
+
+  ⏵ Hello from the fake ACP agent!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+  > send a prompt to this session
+  enter send · pgup/pgdn scroll · ← / esc detach · ? help

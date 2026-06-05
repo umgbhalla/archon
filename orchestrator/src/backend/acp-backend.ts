@@ -27,6 +27,7 @@ import type {
   BackendCapabilities,
   NewSessionResult,
   PermissionMode,
+  PermissionResolver,
   PromptHandle,
   PromptResult,
 } from "./types.ts";
@@ -81,6 +82,8 @@ function mapUpdate(n: SessionNotification): AgentUpdateEvent {
         toolCallId: u.toolCallId,
         title: u.title,
         status: u.status,
+        toolKind: u.kind ?? undefined,
+        isNew: true,
       };
     case "tool_call_update":
       return {
@@ -88,6 +91,8 @@ function mapUpdate(n: SessionNotification): AgentUpdateEvent {
         toolCallId: u.toolCallId,
         title: u.title ?? "",
         status: u.status ?? undefined,
+        toolKind: (u as { kind?: string }).kind ?? undefined,
+        isNew: false,
       };
     case "plan":
       return { kind: "plan", entries: u.entries };
@@ -126,6 +131,8 @@ export class AcpBackend implements AgentBackend {
   private connected = false;
   /** Per-session live update queues (only present while a prompt is in flight). */
   private sessionQueues = new Map<string, UpdateQueue>();
+  /** Per-session interactive permission resolvers (set by the SessionManager). */
+  private permissionResolvers = new Map<string, PermissionResolver>();
 
   constructor(opts: AcpBackendOptions) {
     this.name = opts.name;
@@ -142,6 +149,24 @@ export class AcpBackend implements AgentBackend {
       async requestPermission(
         params: RequestPermissionRequest,
       ): Promise<RequestPermissionResponse> {
+        // Interactive path: if a resolver is registered for this session, hand the
+        // decision to it (the TUI/daemon surfaces a modal + answers). The resolver
+        // returns the chosen optionId, or null to cancel.
+        const resolver = backend.permissionResolvers.get(params.sessionId);
+        if (resolver) {
+          const tc = params.toolCall as { title?: string; kind?: string } | undefined;
+          const choice = await resolver({
+            toolTitle: tc?.title ?? "permission request",
+            toolKind: tc?.kind ?? undefined,
+            options: params.options.map((o) => ({
+              optionId: o.optionId,
+              name: o.name,
+              kind: o.kind,
+            })),
+          });
+          if (choice) return { outcome: { outcome: "selected", optionId: choice } };
+          return { outcome: { outcome: "cancelled" } };
+        }
         // Headless policy mirrors Claude Code permission modes. ACP options carry a
         // `kind` discriminator (allow_once/allow_always/reject_once/reject_always).
         const mode = backend.opts.permissionMode ?? "default";
@@ -152,7 +177,15 @@ export class AcpBackend implements AgentBackend {
           const opt = allow ?? params.options[0];
           if (opt) return { outcome: { outcome: "selected", optionId: opt.optionId } };
         }
-        // default / plan: allow non-destructive once if offered, else cancel and let
+        // plan mode: never act, reject (read-only planning).
+        if (mode === "plan") {
+          const reject =
+            params.options.find((o) => o.kind === "reject_once") ??
+            params.options.find((o) => o.kind === "reject_always");
+          if (reject) return { outcome: { outcome: "selected", optionId: reject.optionId } };
+          return { outcome: { outcome: "cancelled" } };
+        }
+        // default: allow non-destructive once if offered, else cancel and let
         // a human decide (the TUI surfaces the resulting "waiting" state).
         if (allow) return { outcome: { outcome: "selected", optionId: allow.optionId } };
         return { outcome: { outcome: "cancelled" } };
@@ -261,6 +294,11 @@ export class AcpBackend implements AgentBackend {
     return { updates: { [Symbol.asyncIterator]: () => queue.iterator() }, done };
   }
 
+  setPermissionResolver(sessionId: string, resolver: PermissionResolver | undefined): void {
+    if (resolver) this.permissionResolvers.set(sessionId, resolver);
+    else this.permissionResolvers.delete(sessionId);
+  }
+
   async cancel(sessionId: string): Promise<void> {
     this.assertConnected();
     await this.agentProc!.connection.cancel({ sessionId });
@@ -274,6 +312,7 @@ export class AcpBackend implements AgentBackend {
   async dispose(): Promise<void> {
     for (const q of this.sessionQueues.values()) q.close();
     this.sessionQueues.clear();
+    this.permissionResolvers.clear();
     this.agentProc?.kill();
     this.connected = false;
   }

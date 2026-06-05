@@ -146,7 +146,7 @@ import type { SessionSnapshot } from "../core/session-manager.ts";
 
 function snap(id: string, state: SessionSnapshot["state"]): SessionSnapshot {
   const now = Date.now();
-  return { id, agent: "fake", cwd: "/tmp", state, lastMessage: "", createdAt: now, updatedAt: now };
+  return { id, agent: "fake", cwd: "/tmp", state, lastMessage: "", entries: [], createdAt: now, updatedAt: now };
 }
 
 test("applyFilter keeps only waiting sessions when filterWaiting is on", () => {
@@ -176,6 +176,33 @@ test("toggleHelp round-trips and remembers the mode it overlaid", () => {
   expect(s.helpReturnMode).toBe("attached");
   s = reducer(s, { type: "toggleHelp" });
   expect(s.mode).toBe("attached");
+});
+
+test("scroll actions move attachScroll and clamp at zero; attach/detach reset it", () => {
+  let s = initialUiState();
+  expect(s.attachScroll).toBe(0);
+  s = reducer(s, { type: "scrollUp", lines: 10 });
+  s = reducer(s, { type: "scrollUp", lines: 10 });
+  expect(s.attachScroll).toBe(20);
+  s = reducer(s, { type: "scrollDown", lines: 10 });
+  expect(s.attachScroll).toBe(10);
+  // can't scroll below the pinned tail
+  s = reducer(s, { type: "scrollDown", lines: 99 });
+  expect(s.attachScroll).toBe(0);
+  // sending / reset pins back to the tail
+  s = reducer(s, { type: "scrollUp", lines: 5 });
+  s = reducer(s, { type: "scrollReset" });
+  expect(s.attachScroll).toBe(0);
+  // attaching to a session starts pinned; detaching clears it
+  const rows = [snap("a", "completed")];
+  s = reducer(s, { type: "scrollUp", lines: 7 });
+  s = { ...s, selectionKey: "row:a" };
+  s = reducer(s, { type: "attach", sessions: rows });
+  expect(s.attachedId).toBe("a");
+  expect(s.attachScroll).toBe(0);
+  s = reducer(s, { type: "scrollUp", lines: 7 });
+  s = reducer(s, { type: "detach" });
+  expect(s.attachScroll).toBe(0);
 });
 
 test("stopArm then reconcileSelection disarms when the armed session vanishes", () => {

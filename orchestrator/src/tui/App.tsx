@@ -21,6 +21,8 @@ import { TextAttributes } from "@opentui/core";
 import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/react";
 import { useEffect, useReducer, useRef } from "react";
 import type { SessionManager, SessionSnapshot } from "../core/session-manager.ts";
+import { ChatView } from "./ChatView.tsx";
+import { PermissionModal } from "./PermissionModal.tsx";
 import { HELP_SECTIONS, keyToAction } from "./keymap.ts";
 import {
   applyFilter,
@@ -130,61 +132,6 @@ function SessionRow({
   );
 }
 
-// ───────────────────────── Attached view ─────────────────────────
-function AttachedView({
-  session,
-  lines,
-  input,
-  width,
-  height,
-}: {
-  session: SessionSnapshot;
-  lines: string[];
-  input: string;
-  width: number;
-  height: number;
-}) {
-  const icon = iconForLiveness({ alive: session.state !== "stopped", state: session.state });
-  const visibleRows = Math.max(3, height - 8);
-  const tail = lines.slice(-visibleRows);
-  const rule = "─".repeat(Math.max(1, width - 4));
-  return (
-    <box width={width} height={height} flexDirection="column" backgroundColor={c.bg} paddingLeft={2}>
-      <box height={1}><text> </text></box>
-      <box height={1}>
-        <text>
-          <span fg={c.accent} attributes={TextAttributes.BOLD}>{"▟▙  "}</span>
-          <span fg={c.fg} attributes={TextAttributes.BOLD}>{session.id}</span>
-          <span fg={c.fgDim}>{`  ${session.agent} · ${session.cwd}`}</span>
-          <span fg={colorForState(session.state)}>{`   attached ${icon} ${session.state}`}</span>
-        </text>
-      </box>
-      <text fg={c.separator}>{rule}</text>
-      <box flexDirection="column" flexGrow={1}>
-        {tail.length === 0 ? (
-          <box height={1}><text fg={c.fgDim}>{"(no output yet — type a prompt below and press Enter)"}</text></box>
-        ) : (
-          tail.map((ln, i) => (
-            <box key={i} height={1}>
-              <text fg={c.accent} wrapMode="none">{`⏵ ${ln}`}</text>
-            </box>
-          ))
-        )}
-      </box>
-      <text fg={c.separator}>{rule}</text>
-      <box height={1}>
-        <text>
-          <span fg={c.accent}>{"> "}</span>
-          {input.length > 0 ? <span fg={c.fg}>{input}</span> : <span fg={c.fgDim}>{"send a prompt to this session"}</span>}
-        </text>
-      </box>
-      <box height={1}>
-        <text fg={c.fgDim}>{"enter send · ← / esc / ctrl+z detach · ? help"}</text>
-      </box>
-    </box>
-  );
-}
-
 // ───────────────────────── Help overlay ─────────────────────────
 // Generated verbatim from the keymap's HELP_SECTIONS so the docs can never drift
 // from the bindings.
@@ -288,24 +235,22 @@ export function App({ manager, agent, cwd, configAgents }: AppProps) {
   const uiRef = useRef(ui);
   uiRef.current = ui;
 
-  // Live snapshot + transcripts, driven by the manager's event stream.
+  // Live snapshot, driven by the manager's event stream. The structured
+  // conversation now rides on each SessionSnapshot.entries, so the TUI no longer
+  // re-accumulates transcript text by hand — it reads entries straight off the snap.
   const sessionsRef = useRef<SessionSnapshot[]>(manager.snapshot().sessions);
   const [, force] = useReducer((x: number) => x + 1, 0);
-  const transcriptsRef = useRef<Map<string, string[]>>(new Map());
+  // Highlighted option index for the permission modal (per attached session).
+  const permSelRef = useRef(0);
   // Pending disarm timer for the Ctrl+X delete chord.
   const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     renderer.setBackgroundColor(c.bg);
     const onEvent = (ev: unknown) => {
-      const e = ev as { type: string; id?: string; update?: { kind: string; role?: string; text?: string } };
-      if (e.type === "session_chunk" && e.id && e.update?.kind === "message_chunk" && e.update.role === "assistant") {
-        const m = transcriptsRef.current;
-        const lines = m.get(e.id) ?? [];
-        const last = lines[lines.length - 1] ?? "";
-        m.set(e.id, lines.length === 0 ? [e.update.text ?? ""] : [...lines.slice(0, -1), last + (e.update.text ?? "")]);
-      }
-      if (e.type === "session_removed" && e.id) transcriptsRef.current.delete(e.id);
+      const e = ev as { type: string; id?: string };
+      // a fresh permission request resets the modal selection to the first option.
+      if (e.type === "permission_requested") permSelRef.current = 0;
       sessionsRef.current = manager.snapshot().sessions;
       dispatch({ type: "reconcileSelection", sessions: sessionsRef.current });
       force();
@@ -337,6 +282,9 @@ export function App({ manager, agent, cwd, configAgents }: AppProps) {
     void (async () => {
       try {
         const id = await manager.createSession({ agent, cwd, configAgents });
+        // Interactive from creation so permission requests PAUSE (state=waiting)
+        // and surface in the grid / the permission modal — not auto-resolved.
+        manager.setInteractive(id, true);
         dispatch({ type: "setHud", hud: `created ${id} · prompting…` });
         await manager.prompt(id, text);
         dispatch({ type: "setHud", hud: `session ${id} done` });
@@ -348,11 +296,20 @@ export function App({ manager, agent, cwd, configAgents }: AppProps) {
 
   const sendPrompt = (id: string, text: string) => {
     dispatch({ type: "attachClear" });
+    dispatch({ type: "scrollReset" });
     dispatch({ type: "setHud", hud: `prompting ${id}…` });
+    // Interactive: the attached view answers permission prompts via the modal.
+    manager.setInteractive(id, true);
     void manager.prompt(id, text).then(
       () => dispatch({ type: "setHud", hud: `turn done ${id}` }),
       (err) => dispatch({ type: "setHud", hud: `error: ${(err as Error).message}` }),
     );
+  };
+
+  // Answer the attached session's pending permission, if any.
+  const answerPermission = (id: string, optionId: string | null) => {
+    manager.answerPermission(id, optionId);
+    dispatch({ type: "setHud", hud: optionId ? `allowed ${id}` : `denied ${id}` });
   };
 
   const clearArmTimer = () => {
@@ -400,6 +357,45 @@ export function App({ manager, agent, cwd, configAgents }: AppProps) {
   useKeyboard((key) => {
     const cur = uiRef.current;
     const curSessions = sessionsRef.current;
+
+    // Permission modal: when attached to a session awaiting a permission answer,
+    // keystrokes drive the modal (number keys / arrows select, Enter confirms,
+    // Esc denies) and short-circuit all other bindings.
+    if (cur.mode === "attached" && cur.attachedId) {
+      const attached = curSessions.find((s) => s.id === cur.attachedId);
+      const pending = attached?.pendingPermission;
+      if (pending) {
+        const n = pending.options.length;
+        if (key.name === "escape") {
+          answerPermission(cur.attachedId, null);
+          return;
+        }
+        if (key.name === "up") {
+          permSelRef.current = (permSelRef.current - 1 + n) % n;
+          force();
+          return;
+        }
+        if (key.name === "down") {
+          permSelRef.current = (permSelRef.current + 1) % n;
+          force();
+          return;
+        }
+        if (/^[1-9]$/.test(key.sequence ?? "")) {
+          const idx = Number(key.sequence) - 1;
+          if (idx < n) {
+            answerPermission(cur.attachedId, pending.options[idx]!.optionId);
+          }
+          return;
+        }
+        if (key.name === "return") {
+          const opt = pending.options[permSelRef.current];
+          answerPermission(cur.attachedId, opt ? opt.optionId : null);
+          return;
+        }
+        return; // swallow everything else while the modal is up
+      }
+    }
+
     // Enter is overloaded + async-side-effecting, so intercept it here.
     if (key.name === "return") {
       if (cur.mode === "attached" && cur.attachedId) {
@@ -427,14 +423,22 @@ export function App({ manager, agent, cwd, configAgents }: AppProps) {
     if (action) dispatch(action as UiAction);
   });
 
-  // Fullscreen replacement: attached session (help can overlay it).
+  // Fullscreen replacement: attached session (help / permission can overlay it).
   if (ui.mode === "attached" && ui.attachedId) {
     const attached = sessions.find((s) => s.id === ui.attachedId);
     if (attached) {
-      const lines = transcriptsRef.current.get(attached.id) ?? [];
       return (
         <box width={width} height={height}>
-          <AttachedView session={attached} lines={lines} input={ui.attachInput} width={width} height={height} />
+          <ChatView session={attached} input={ui.attachInput} width={width} height={height} scrollOffset={ui.attachScroll} />
+          {attached.pendingPermission ? (
+            <PermissionModal
+              pending={attached.pendingPermission}
+              selectedIndex={permSelRef.current}
+              answer={(optId) => answerPermission(attached.id, optId)}
+              width={width}
+              height={height}
+            />
+          ) : null}
         </box>
       );
     }
@@ -442,10 +446,9 @@ export function App({ manager, agent, cwd, configAgents }: AppProps) {
   if (ui.mode === "help" && ui.helpReturnMode === "attached" && ui.attachedId) {
     const attached = sessions.find((s) => s.id === ui.attachedId);
     if (attached) {
-      const lines = transcriptsRef.current.get(attached.id) ?? [];
       return (
         <box width={width} height={height}>
-          <AttachedView session={attached} lines={lines} input={ui.attachInput} width={width} height={height} />
+          <ChatView session={attached} input={ui.attachInput} width={width} height={height} scrollOffset={ui.attachScroll} />
           <HelpOverlay width={width} height={height} />
         </box>
       );

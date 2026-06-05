@@ -1,0 +1,34 @@
+
+  ▟▙  archon  fleet · agent=fake
+      1 sessions · 1 need input · 0 working · 0 completed
+
+      Needs input  (1)
+        ✻ fake-session-1   —
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+  ❯ describe a task for a new session
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+  ↑/↓ select · enter/→ attach · ctrl+x stop · w needs-input · ? help · q exit
+  hud created fake-session-1 · prompting…

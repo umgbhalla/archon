@@ -19,8 +19,21 @@
  * worktree. The first edit is detected from the prompt stream's tool_call updates.
  */
 import { EventEmitter } from "node:events";
-import type { AgentBackend, AgentUpdateEvent, PermissionMode } from "../backend/types.ts";
+import type {
+  AgentBackend,
+  AgentUpdateEvent,
+  PermissionMode,
+  PermissionRequest,
+} from "../backend/types.ts";
 import { createBackend, type CreateBackendOptions } from "../backend/registry.ts";
+import {
+  emptyConversation,
+  endTurn,
+  foldEvent,
+  pushUserEntry,
+  type Conversation,
+  type ConversationEntry,
+} from "./conversation.ts";
 import {
   DEFAULT_WORKTREE_CONFIG,
   type WorktreeConfig,
@@ -41,6 +54,15 @@ export type SessionState =
   | "failed" // error / refusal
   | "stopped"; // cancelled / disposed
 
+/** A permission request awaiting a user answer (surfaced for the interactive flow). */
+export interface PendingPermission {
+  /** Opaque id the UI echoes back via answerPermission. */
+  requestId: string;
+  toolTitle: string;
+  toolKind?: string;
+  options: { optionId: string; name: string; kind: string }[];
+}
+
 export interface SessionSnapshot {
   id: string;
   agent: string;
@@ -48,6 +70,10 @@ export interface SessionSnapshot {
   state: SessionState;
   /** Accumulated assistant text from the latest turn. */
   lastMessage: string;
+  /** Ordered structured conversation (chat substrate). */
+  entries: ConversationEntry[];
+  /** Present (and state==="waiting") while awaiting an interactive permission answer. */
+  pendingPermission?: PendingPermission;
   /** Last stopReason, if any. */
   lastStopReason?: string;
   /** Absolute worktree path once isolation has materialized (ADR-0009); else undefined. */
@@ -56,8 +82,17 @@ export interface SessionSnapshot {
   updatedAt: number;
 }
 
-interface SessionRecord extends SessionSnapshot {
+interface SessionRecord
+  extends Omit<SessionSnapshot, "entries" | "pendingPermission"> {
   backend: AgentBackend;
+  /** Live structured conversation accumulator (folded into snapshot.entries). */
+  conversation: Conversation;
+  /** Set while an interactive permission answer is pending. */
+  pendingPermission?: PendingPermission;
+  /** Resolver for the in-flight pending permission (set by the resolver promise). */
+  resolvePermission?: (optionId: string | null) => void;
+  /** True if an interactive permission resolver is registered for this session. */
+  interactive: boolean;
   /** The session's original cwd (worktree, if any, is derived from this). */
   rootCwd: string;
   /** Worktree handle once created; undefined until the first edit (or if skipped). */
@@ -77,6 +112,7 @@ export type ManagerEvent =
   | { type: "session_created"; session: SessionSnapshot }
   | { type: "session_updated"; session: SessionSnapshot }
   | { type: "session_chunk"; id: string; update: AgentUpdateEvent }
+  | { type: "permission_requested"; id: string; session: SessionSnapshot }
   | { type: "session_removed"; id: string };
 
 export interface CreateSessionOptions {
@@ -138,6 +174,8 @@ export class SessionManager extends EventEmitter {
       rootCwd: opts.cwd,
       state: "idle",
       lastMessage: "",
+      conversation: emptyConversation(),
+      interactive: false,
       createdAt: now,
       updatedAt: now,
       worktreeResolved: this.worktreeCfg(opts).bgIsolation === "none",
@@ -194,25 +232,35 @@ export class SessionManager extends EventEmitter {
     text: string,
   ): Promise<{ message: string; stopReason: string }> {
     const rec = this.require(id);
+    // Multi-turn: append the user entry, then open an assistant-streaming turn.
+    // `turnMessage` accumulates only THIS turn's assistant text (entries hold the
+    // full multi-turn history).
+    pushUserEntry(rec.conversation, text);
+    this.touch(rec);
     this.setState(rec, "busy");
     const handle = rec.backend.prompt(id, text);
-    let message = "";
+    let turnMessage = "";
     try {
       for await (const update of handle.updates) {
+        // Fold the event into the structured conversation (grows/updates entries).
+        foldEvent(rec.conversation, update);
         if (update.kind === "message_chunk" && update.role === "assistant") {
-          message += update.text;
-          rec.lastMessage = message;
-          rec.updatedAt = Date.now();
+          turnMessage += update.text;
+          rec.lastMessage = turnMessage;
           // mirror assistant text to the durable transcript (best-effort).
           void this.store.appendTranscript(id, update.text).catch(() => {});
         }
         // First edit signal: a tool call implies the agent may touch the FS.
-        if (update.kind === "tool_call" && !rec.worktreeResolved) {
+        if (update.kind === "tool_call" && update.isNew && !rec.worktreeResolved) {
           await this.ensureWorktree(id);
         }
+        this.touch(rec);
+        // entries grew/changed → let observers (TUI) re-render live.
         this.emitEvent({ type: "session_chunk", id, update });
+        this.emitEvent({ type: "session_updated", session: this.toSnapshot(rec) });
       }
       const { stopReason } = await handle.done;
+      endTurn(rec.conversation);
       rec.lastStopReason = stopReason;
       this.setState(
         rec,
@@ -224,17 +272,80 @@ export class SessionManager extends EventEmitter {
               ? "failed"
               : "idle",
       );
-      return { message, stopReason };
+      return { message: turnMessage, stopReason };
     } catch (err) {
+      endTurn(rec.conversation);
       rec.lastStopReason = `error: ${(err as Error).message}`;
       this.setState(rec, "failed");
       throw err;
     }
   }
 
+  /**
+   * Register an interactive permission resolver for a session. Once set, the
+   * backend's requestPermission delegates here: the session is moved to "waiting",
+   * pendingPermission is exposed on the snapshot, and the turn blocks until the UI
+   * calls answerPermission(). Pass undefined to revert to headless mode policy.
+   */
+  setInteractive(id: string, on: boolean): void {
+    const rec = this.require(id);
+    rec.interactive = on;
+    if (!rec.backend.setPermissionResolver) return;
+    if (!on) {
+      rec.backend.setPermissionResolver(id, undefined);
+      return;
+    }
+    rec.backend.setPermissionResolver(id, (req: PermissionRequest) =>
+      this.beginPermission(rec, req),
+    );
+  }
+
+  /** Open a pending-permission window and return a promise resolved by answerPermission. */
+  private beginPermission(
+    rec: SessionRecord,
+    req: PermissionRequest,
+  ): Promise<string | null> {
+    return new Promise<string | null>((resolve) => {
+      rec.pendingPermission = {
+        requestId: `perm-${rec.conversation.seq++}`,
+        toolTitle: req.toolTitle,
+        toolKind: req.toolKind,
+        options: req.options.map((o) => ({
+          optionId: o.optionId,
+          name: o.name,
+          kind: o.kind,
+        })),
+      };
+      rec.resolvePermission = (optionId) => {
+        rec.pendingPermission = undefined;
+        rec.resolvePermission = undefined;
+        resolve(optionId);
+      };
+      this.setState(rec, "waiting");
+      this.emitEvent({ type: "permission_requested", id: rec.id, session: this.toSnapshot(rec) });
+    });
+  }
+
+  /**
+   * Answer a pending interactive permission. optionId selects an option; null
+   * cancels. No-op if nothing is pending. Moves the session back to "busy" so the
+   * turn continues streaming.
+   */
+  answerPermission(id: string, optionId: string | null): void {
+    const rec = this.require(id);
+    const resolve = rec.resolvePermission;
+    if (!resolve) return;
+    this.setState(rec, "busy");
+    resolve(optionId);
+  }
+
   async cancel(id: string): Promise<void> {
     const rec = this.require(id);
+    // If a permission answer is pending, unblock it (cancelled) so the in-flight
+    // requestPermission resolves and the turn can wind down.
+    if (rec.resolvePermission) rec.resolvePermission(null);
     await rec.backend.cancel(id);
+    endTurn(rec.conversation);
     this.setState(rec, "stopped");
   }
 
@@ -324,6 +435,12 @@ export class SessionManager extends EventEmitter {
     // open a fresh underlying session; we keep the persisted id as our key.
     await backend.newSession(opts.cwd);
     const snap = p.snapshot;
+    // Rehydrate the structured conversation from the persisted snapshot entries.
+    const restoredEntries = snap.entries ?? [];
+    const conversation: Conversation = {
+      entries: restoredEntries.map((e) => ({ ...e })),
+      seq: restoredEntries.length,
+    };
     const rec: SessionRecord = {
       id: snap.id,
       agent: snap.agent,
@@ -331,6 +448,8 @@ export class SessionManager extends EventEmitter {
       rootCwd: opts.cwd,
       state: "idle",
       lastMessage: snap.lastMessage,
+      conversation,
+      interactive: false,
       lastStopReason: snap.lastStopReason,
       worktreePath: snap.worktreePath,
       createdAt: snap.createdAt,
@@ -379,6 +498,11 @@ export class SessionManager extends EventEmitter {
     this.emitEvent({ type: "session_updated", session: this.toSnapshot(rec) });
   }
 
+  /** Bump updatedAt without emitting (used inside the streaming loop). */
+  private touch(rec: SessionRecord): void {
+    rec.updatedAt = Date.now();
+  }
+
   /** Mirror a record's metadata to the persistence sink (best-effort, async). */
   private persist(rec: SessionRecord): void {
     void this.store
@@ -389,13 +513,22 @@ export class SessionManager extends EventEmitter {
   private toSnapshot(rec: SessionRecord): SessionSnapshot {
     const {
       backend: _backend,
+      conversation: _conv,
+      resolvePermission: _rp,
+      interactive: _ix,
       rootCwd: _rootCwd,
       worktree: _worktree,
       worktreeResolved: _wr,
       createOptions: _co,
+      pendingPermission,
       ...snap
     } = rec;
-    return { ...snap };
+    return {
+      ...snap,
+      // deep-ish copy entries so consumers (and the wire) get an immutable view.
+      entries: rec.conversation.entries.map((e) => ({ ...e })),
+      ...(pendingPermission ? { pendingPermission } : {}),
+    };
   }
 
   private emitEvent(ev: ManagerEvent): void {

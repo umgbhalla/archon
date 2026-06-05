@@ -20,10 +20,35 @@ export type AgentUpdateEvent =
       toolCallId: string;
       title: string;
       status?: string;
+      /** ACP tool kind (read/edit/execute/...), if reported. */
+      toolKind?: string;
+      /** True on the first tool_call notification, false on tool_call_update. */
+      isNew?: boolean;
     }
   | { kind: "plan"; entries: unknown[] }
   | { kind: "mode_changed"; modeId: string }
   | { kind: "raw"; update: unknown };
+
+/** A single permission option offered by the agent (ACP PermissionOption). */
+export interface PermissionOption {
+  optionId: string;
+  name: string;
+  kind: "allow_once" | "allow_always" | "reject_once" | "reject_always";
+}
+
+/** A pending permission request surfaced to an interactive resolver. */
+export interface PermissionRequest {
+  toolTitle: string;
+  toolKind?: string;
+  options: PermissionOption[];
+}
+
+/**
+ * Interactive permission resolver. When registered on a backend, the ACP
+ * `requestPermission` callback delegates to it instead of applying the headless
+ * mode policy: it must resolve with a chosen optionId, or null to cancel.
+ */
+export type PermissionResolver = (req: PermissionRequest) => Promise<string | null>;
 
 /** Result of a completed prompt turn. */
 export interface PromptResult {
@@ -69,6 +94,12 @@ export interface AgentBackend {
   loadSession?(sessionId: string, cwd: string): Promise<void>;
   /** Send a prompt; returns a streaming handle. */
   prompt(sessionId: string, text: string): PromptHandle;
+  /**
+   * Register (or clear, with undefined) an interactive permission resolver for a
+   * session. When set, ACP `requestPermission` calls for that session delegate to
+   * the resolver instead of the headless mode policy.
+   */
+  setPermissionResolver?(sessionId: string, resolver: PermissionResolver | undefined): void;
   /** Cancel the in-flight prompt turn for a session. */
   cancel(sessionId: string): Promise<void>;
   /** Switch session mode (only if capabilities.setMode). */

@@ -1,0 +1,34 @@
+
+  ▟▙  fake-session-1  fake · /Users/umang/hub/zonko/archon/orchestrator   attached ✻ waiting
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+  › edit a file to add a license header
+
+  ✻ I should edit the file.
+
+  ⚙ Edit src/example.txt  [pending edit]
+
+
+
+
+           ╭─ Permission required ──────────────────────────────────────────────────────╮
+           │                                                                            │
+           │  ⚙ Edit src/example.txt                                                    │
+           │  wants to edit a file  (edit)                                              │
+           │                                                                            │
+           │  ❯ 1. ✓ Allow                                                              │
+           │    2. ✗ Reject                                                             │
+           │                                                                            │
+           │                                                                            │
+           ╰───────────── 1-9 choose · ↑↓ move · enter confirm · esc deny ──────────────╯
+
+
+
+
+
+
+
+
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+  > send a prompt to this session
+  enter send · pgup/pgdn scroll · ctrl+c interrupt · ← / esc detach · ? help

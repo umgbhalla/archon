@@ -7,8 +7,9 @@ import { DaemonServer } from "./server.ts";
 import { connectDaemon, type DaemonClient } from "./client.ts";
 import { FilePersistence, daemonPaths } from "./persistence.ts";
 import { SessionManager } from "../core/session-manager.ts";
-import { FAKE_REPLY } from "../testing/fake-acp-agent.ts";
+import { FAKE_REPLY, FAKE_ALLOW_OPTION } from "../testing/fake-acp-agent.ts";
 import type { PromptStreamEvent } from "./protocol.ts";
+import type { SessionSnapshot } from "../core/session-manager.ts";
 
 const cleanups: Array<() => Promise<void> | void> = [];
 afterEach(async () => {
@@ -70,6 +71,45 @@ test("daemon round-trip: start -> createSession(fake) -> prompt -> stream -> sto
 
   void server;
 });
+
+test("daemon round-trip: entries + pendingPermission travel over the wire; answerPermission resolves", async () => {
+  const configDir = tmpConfigDir();
+  await startServer(configDir);
+
+  const client = await connectDaemon({ configDir });
+  cleanups.push(() => client.close());
+
+  const id = await client.createSession({ agent: "fake", cwd: configDir });
+
+  // attach: live snapshots (with entries + pendingPermission) stream over the wire.
+  let latest: SessionSnapshot | undefined;
+  let sawPending = false;
+  await client.attach((ev) => {
+    if (ev.type === "permission_requested" && ev.id === id) {
+      sawPending = true;
+      latest = ev.session;
+      // the snapshot carried the pending permission over the wire.
+      expect(ev.session.pendingPermission?.options.some((o) => o.optionId === FAKE_ALLOW_OPTION)).toBe(true);
+      // answer it remotely.
+      void client.answerPermission(id, FAKE_ALLOW_OPTION);
+    } else if (ev.type === "session_updated" && ev.session.id === id) {
+      latest = ev.session;
+    }
+  });
+
+  // enable interactive handling on the daemon, then prompt with the edit trigger.
+  await client.setInteractive(id, true);
+  const res = await client.prompt(id, "please edit something");
+  // let the trailing attach updates flush.
+  await new Promise((r) => setTimeout(r, 50));
+
+  expect(sawPending).toBe(true);
+  expect(res.stopReason).toBe("end_turn");
+  // entries arrived over the wire and include a completed tool_call.
+  expect(latest?.entries.some((e) => e.kind === "user")).toBe(true);
+  const tc = latest?.entries.find((e) => e.kind === "tool_call") as { status?: string } | undefined;
+  expect(tc?.status).toBe("completed");
+}, 20000);
 
 test("socket is owner-only (0600)", async () => {
   const configDir = tmpConfigDir();

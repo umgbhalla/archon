@@ -1,0 +1,27 @@
+{
+  "clips": [
+    {
+      "from": "01-grid",
+      "to": "02-needsinput",
+      "caption": "Dispatch an agent task (fake ACP agent)"
+    },
+    {
+      "from": "02-needsinput",
+      "to": "03-permission",
+      "caption": "Agent requests a tool \u2192 session pauses: Needs input",
+      "hold_ms": 1200
+    },
+    {
+      "from": "03-permission",
+      "to": "04-approved",
+      "caption": "Attach: real chat (user/thought/tool-call) + interactive Permission modal",
+      "hold_ms": 2000
+    },
+    {
+      "from": "04-approved",
+      "to": "05-followup",
+      "caption": "Approve \u2192 tool completes \u2192 assistant reply",
+      "hold_ms": 1400
+    }
+  ]
+}

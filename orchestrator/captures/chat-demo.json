@@ -1,0 +1,46 @@
+{
+  "clips": [
+    {
+      "from": "launch",
+      "to": "dispatch-typed",
+      "caption": "archon chat TUI — agent=fake (deterministic, no creds)",
+      "hold_ms": 600
+    },
+    {
+      "from": "dispatch-typed",
+      "to": "session-created",
+      "caption": "Dispatch a task: type a prompt + Enter → a new session",
+      "hold_ms": 900
+    },
+    {
+      "from": "session-created",
+      "to": "attached",
+      "caption": "Attach (↓ + Enter): the structured conversation log",
+      "hold_ms": 900
+    },
+    {
+      "from": "attached",
+      "to": "permission-modal",
+      "caption": "Send 'edit a file' → streamed thought + tool_call card + permission prompt",
+      "hold_ms": 2000
+    },
+    {
+      "from": "permission-modal",
+      "to": "allowed-resumed",
+      "caption": "Press 1 (Allow) → tool_call completes, the turn resumes and finishes",
+      "hold_ms": 2000
+    },
+    {
+      "from": "allowed-resumed",
+      "to": "followup-turn",
+      "caption": "Send a follow-up turn — multi-turn conversation in one session",
+      "hold_ms": 1500
+    },
+    {
+      "from": "followup-turn",
+      "to": "scrollback",
+      "caption": "More turns overflow the viewport → PgUp scrolls back through history",
+      "hold_ms": 2000
+    }
+  ]
+}

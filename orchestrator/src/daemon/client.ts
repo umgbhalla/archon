@@ -49,6 +49,10 @@ export interface DaemonClient {
   ): Promise<{ message: string; stopReason: string }>;
   /** Subscribe to the full manager event stream. Returns an unsubscribe fn. */
   attach(onEvent: (ev: AttachStreamEvent) => void): Promise<() => void>;
+  /** Answer a pending interactive permission (optionId, or null to cancel). */
+  answerPermission(id: string, optionId: string | null): Promise<void>;
+  /** Toggle interactive permission handling for a session. */
+  setInteractive(id: string, on: boolean): Promise<void>;
   stop(id: string, remove?: boolean): Promise<void>;
   logs(id: string): Promise<LogsResult>;
   /** Ask the daemon to shut down (no-op for the in-process fallback). */
@@ -175,6 +179,14 @@ class SocketClient implements DaemonClient {
     return () => this.streamHandlers.delete(id);
   }
 
+  async answerPermission(id: string, optionId: string | null): Promise<void> {
+    await this.call("answerPermission", { id, optionId });
+  }
+
+  async setInteractive(id: string, on: boolean): Promise<void> {
+    await this.call("setInteractive", { id, on });
+  }
+
   async stop(id: string, remove?: boolean): Promise<void> {
     await this.call("stop", { id, remove });
   }
@@ -240,6 +252,12 @@ export class InProcessClient implements DaemonClient {
       onEvent({ type: "session_created", session: s });
     }
     return () => this.manager.off("event", onEvent);
+  }
+  async answerPermission(id: string, optionId: string | null): Promise<void> {
+    this.manager.answerPermission(id, optionId);
+  }
+  async setInteractive(id: string, on: boolean): Promise<void> {
+    this.manager.setInteractive(id, on);
   }
   async stop(id: string, remove?: boolean): Promise<void> {
     if (remove) await this.manager.remove(id);

@@ -14,15 +14,25 @@ It ships two surfaces:
   a dual-channel status glyph (color = state, shape = liveness), a dispatch
   input to spawn new sessions, an attached view that streams an agent's ACP
   updates live, filter-to-needs-input, and a Ctrl+X stop/delete chord.
+- a **chat surface** inside the attached view — the session's ACP stream is
+  folded into a structured conversation (`src/core/conversation.ts`) and rendered
+  as a Claude-Code-like log: user / assistant turns (live streaming spinner +
+  caret), `thought` entries, `tool_call` status cards, and `plan` checklists, with
+  PgUp/PgDn scrollback. When a turn needs approval, an interactive **permission
+  modal** surfaces the request and the user picks an option (number keys / arrows /
+  Enter); the answer resolves back to the agent and the turn resumes.
 
 A per-user **supervisor daemon** owns the sessions (auto-started on demand) so
 they survive across CLI/TUI invocations and across daemon restarts; the CLI and
 TUI are thin clients over it (ADR-0004).
 
-Built with **Bun + TypeScript**. Strict typecheck, 66 unit/integration/e2e tests
-green. The end-to-end path is exercised in CI against a bundled credential-free
-**fake ACP agent**; real agents (`claude`, `gemini`) are wired by their known
-spawn specs but require their binaries + credentials and are not run in CI.
+Built with **Bun + TypeScript**. Strict typecheck, 79 unit/integration/e2e tests
+green (2 real-agent tests skipped unless `ARCHON_TEST_REAL=1`). The end-to-end path is exercised in CI against a bundled credential-free
+**fake ACP agent**. Real agents — `claude`, `codex`, `gemini`, `goose`,
+`opencode`, `copilot`, `qwen`, `cursor`, `amp` — are wired by their known ACP
+spawn specs but require their binaries + credentials and are not run in CI
+(`claude` → "BANANA" and `codex` → "391" were verified by hand on the dev host;
+see the gated `src/real-integration.test.ts`).
 
 ---
 
@@ -59,7 +69,7 @@ straight from TypeScript via Bun.
 
 ```bash
 bunx tsc --noEmit   # typecheck (strict, clean)
-bun test            # 66 tests across 10 files
+bun test            # 70 tests (68 pass, 2 real-agent skipped without ARCHON_TEST_REAL)
 ```
 
 ### Run it as `archon` (global install)
@@ -107,7 +117,7 @@ archon --help, -h               Show help
 
 | flag | meaning |
 |------|---------|
-| `--agent <name>` | Agent backend to use (default from config; `fake`, `claude`, `gemini`, `generic`, or a config-registered name) |
+| `--agent <name>` | Agent backend to use (default from config; `fake`, `claude`, `codex`, `gemini`, `goose`, `opencode`, `copilot`, `qwen`, `cursor`, `amp`, `generic`, or a config-registered name) |
 | `--acp-cmd "<argv>"` | Spawn command for the `generic`/custom agent, e.g. `--acp-cmd "my-agent --acp"` (tokenized, honors quotes) |
 | `--model <id>` | Model id, passed through where the backend supports it |
 | `--cwd <path>` | Working directory for the session (default: process cwd) |
@@ -169,8 +179,27 @@ drifts. The bindings:
 | `q` | Exit to the shell (when the input is empty) |
 | `Ctrl+C` | Clear the input, else exit |
 
-In the **attached view**: type + `Enter` sends a prompt to that session; `←` /
-`Esc` / `Ctrl+Z` detach back to the grid; `?` toggles help.
+In the **attached view** (the chat surface):
+
+| key | action |
+|-----|--------|
+| type + `Enter` | Send the typed prompt to the attached session |
+| `PgUp` / `PgDn` | Scroll back / forward through the transcript (auto-pins to the tail while a turn streams) |
+| `←` / `Esc` / `Ctrl+Z` | Detach back to the grid |
+| `?` | Toggle help (only when the input is empty) |
+
+When a session is awaiting permission, the **permission modal** captures keys:
+
+| key | action |
+|-----|--------|
+| `1`–`9` | Pick that numbered option |
+| `↑` / `↓` | Move the highlight |
+| `Enter` | Confirm the highlighted option |
+| `Esc` | Deny (cancel the request) |
+
+The attached view sets the session **interactive** before each prompt, so the
+agent's `session/request_permission` is routed to the modal instead of being
+answered by the headless permission-mode policy.
 
 ---
 
@@ -227,12 +256,19 @@ subprocess only if present): `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` /
 
 ### Permission modes
 
-How archon answers the agent's `session/request_permission` requests headlessly:
+How archon answers the agent's `session/request_permission` requests **when a
+session is non-interactive** (headless `-p`, or a grid-dispatched session before
+you attach):
 
-- **default** / **plan** — allow a non-destructive option if the agent offers one,
-  otherwise cancel and (in the TUI, future) surface to a human.
+- **default** — allow a non-destructive `allow_once`/`allow_always` option if the
+  agent offers one, otherwise cancel.
+- **plan** — reject (read-only planning), so the agent never acts.
 - **acceptEdits** / **bypassPermissions** — auto-select the allow option (or the
   first offered) so edits proceed unattended.
+
+When you **attach** in the TUI, the session is flipped interactive and the request
+is instead surfaced to the live **permission modal** (see the attached-view keys
+above) — the headless policy no longer applies for that turn.
 
 ---
 
@@ -245,10 +281,19 @@ clear, hinted error if the launcher binary is missing from `PATH`.
 
 | name | spawn command | runnable here | notes |
 |------|---------------|---------------|-------|
-| `fake` | `bun run src/testing/fake-acp-agent.ts` | yes | Deterministic 3-chunk reply + `end_turn`; supports cancel. No model/network. Used by e2e + smokes. |
-| `claude` | `npx -y @agentclientprotocol/claude-agent-acp` | needs setup | Full Claude Code over ACP (Zed adapter): streaming text + thoughts, tool calls, fs read/write, plan, session modes. Needs Node/npx + Anthropic auth. |
-| `gemini` | `gemini --experimental-acp` | needs setup | Gemini CLI in experimental ACP mode over stdio. Streaming text + tool calls. ACP support is experimental. |
+| `fake` | `bun run src/testing/fake-acp-agent.ts` | yes | Bundled standalone ACP test agent. Deterministic 3-chunk reply + `end_turn`; supports cancel. No model/network. Used by e2e + smokes. |
+| `claude` | `npx -y @agentclientprotocol/claude-agent-acp` | needs setup | Claude Code over ACP (official adapter): streaming text + thoughts, tool calls, fs read/write, plan, session modes. Needs Node/npx + Anthropic auth. |
+| `codex` | `npx -y @zed-industries/codex-acp` | needs setup | OpenAI Codex over ACP via Zed's adapter (the local `codex` binary is not ACP; the adapter supplies it). ChatGPT subscription / `codex login`. |
+| `gemini` | `gemini --experimental-acp` | needs setup | Gemini CLI in experimental ACP mode over stdio. Streaming text + tool calls; ACP support is experimental. |
+| `goose` | `goose acp` | needs setup | Block's Goose in native ACP mode (configure providers via `goose configure`). |
+| `opencode` | `opencode acp` | needs setup | opencode (sst) in native ACP mode (`/undo`, `/redo` unsupported over ACP). |
+| `copilot` | `copilot --acp` | needs setup | GitHub Copilot CLI in native ACP mode (public preview; needs a Copilot subscription). |
+| `qwen` | `qwen --acp` | needs setup | Qwen Code in native ACP mode (Node ≥ 22; legacy `--experimental-acp` deprecated). |
+| `cursor` | `cursor-agent acp` | needs setup | Cursor agent CLI in native ACP mode (no `session/load` — resume unavailable). |
+| `amp` | `npx -y @superagenticai/acp-amp run` | needs setup | Sourcegraph Amp via the community `acp-amp` bridge (tier-2; needs paid Amp credits; best-effort). |
 | `generic` | *(supplied via `--acp-cmd`)* | needs setup | Escape hatch — any ACP-over-stdio agent. Supply the launch argv with `--acp-cmd`. |
+
+Run `archon agents` (or `agents --json`) for the live registry, exact commands, and the auth env each agent reads.
 
 See `docs/agents.md` for capability detail and `docs/config.md` for the full
 config reference.
@@ -280,7 +325,10 @@ src/
   core/       supervisor + isolation
     session-manager.ts   SessionManager: createSession / prompt / cancel / setMode /
                          remove / snapshot() + EventEmitter; logical state model;
+                         setInteractive() + answerPermission() drive the modal;
                          restore() recovers persisted sessions on daemon start
+    conversation.ts      structured ConversationEntry model: folds ACP updates into
+                         user/assistant/thought/tool_call/plan entries (snapshot.entries)
     worktree.ts          git-worktree isolation (lazy, per-session, opt-out)
   daemon/     per-user supervisor daemon (ADR-0004)
     server.ts       DaemonServer: owns the SessionManager, serves a 0600 unix socket,
@@ -292,9 +340,13 @@ src/
   tui/        the fleet TUI (OpenTUI + React)
     index.tsx       runTui(): mount the renderer against a live SessionManager
     App.tsx         session grid (grouped by state, dual-channel glyph), dispatch
-                    input, attached streaming view
-    store.ts        UI reducer + render-group builder (selection tracked by session id)
-    keymap.ts       key -> action mapping
+                    input, attached chat view; owns keymap->action + permission wiring
+    ChatView.tsx    chat substrate: renders snapshot.entries as a session log
+                    (turns, thought, tool_call cards, plan checklists) + scrollback
+    PermissionModal.tsx  interactive permission prompt overlay (numbered options)
+    store.ts        UI reducer + render-group builder (selection tracked by session id;
+                    attachScroll scrollback offset)
+    keymap.ts       key -> action mapping (grid / attached / help; PgUp/PgDn scroll)
     theme.ts        colors + state/liveness glyph mapping
   testing/
     fake-acp-agent.ts   standalone ACP server (AgentSideConnection) for credential-free e2e
@@ -356,15 +408,18 @@ Relevant ADRs: 0001 (Bun/TS), 0003 (AgentBackend control plane), 0004
   attached streaming view, **filter-to-needs-input (`w`)**, the **Ctrl+X
   stop-then-delete chord** (2s confirm), and a `?` help overlay generated from
   the keymap — all wired to the backend. See the captioned demo below.
-- Strict typecheck clean; 66 tests green across 10 files (config, agents,
-  transport, registry incl. agent-startup-error cases, worktree, session-manager,
-  daemon round-trip + persistence-reload, tui, cli, e2e).
+- Strict typecheck clean; 70 tests across 11 files (68 pass; 2 real-agent
+  integration tests skip unless `ARCHON_TEST_REAL=1`): config, agents, transport,
+  registry incl. agent-startup-error cases, worktree, session-manager, daemon
+  round-trip + persistence-reload, tui, cli, e2e, real-integration.
 
 **Stubbed / not done yet**
 
-- **Only the `fake` agent is exercised in CI.** `claude` / `gemini` are wired by
-  their spawn specs and the client handshake is generic ACP, but they require the
-  real binaries + credentials and are not run automatically.
+- **Only the `fake` agent is exercised in CI.** The real agents (`claude`,
+  `codex`, `gemini`, `goose`, `opencode`, `copilot`, `qwen`, `cursor`, `amp`)
+  share the generic-ACP client handshake and are wired by their spawn specs, but
+  need real binaries + credentials. `claude` and `codex` were verified by hand
+  (gated `src/real-integration.test.ts`, `ARCHON_TEST_REAL=1`).
 - **Permission handling is headless-policy only** — the TUI does not yet prompt a
   human for `session/request_permission`; the configured mode decides.
 - **`--model` is passed through only where a backend supports it**; the fake agent
@@ -386,7 +441,7 @@ Relevant ADRs: 0001 (Bun/TS), 0003 (AgentBackend control plane), 0004
 ```bash
 bun install
 bunx tsc --noEmit                                 # typecheck
-bun test                                          # 66 tests
+bun test                                          # 70 tests
 bun run src/cli.ts -p "hello" --agent fake        # headless e2e: "Hello from the fake ACP agent!"
 ARCHON_TUI=1 bun run src/cli.ts                   # force the fleet TUI
 bun run src/cli.ts agents --json                  # registry
