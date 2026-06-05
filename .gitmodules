@@ -88,3 +88,7 @@
 [submodule "context/termcast"]
 	path = context/termcast
 	url = https://github.com/remorses/termcast
+[submodule "context/opencode"]
+	path = context/opencode
+	url = https://github.com/sst/opencode
+	branch = dev
