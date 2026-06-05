@@ -92,3 +92,120 @@
 	path = context/opencode
 	url = https://github.com/sst/opencode
 	branch = dev
+[submodule "context/create-tui"]
+	path = context/create-tui
+	url = https://github.com/msmps/create-tui.git
+[submodule "context/opentui-examples"]
+	path = context/opentui-examples
+	url = https://github.com/msmps/opentui-examples.git
+[submodule "context/opentui-ui"]
+	path = context/opentui-ui
+	url = https://github.com/msmps/opentui-ui.git
+[submodule "context/opentui-spinner"]
+	path = context/opentui-spinner
+	url = https://github.com/msmps/opentui-spinner.git
+[submodule "context/critique"]
+	path = context/critique
+	url = https://github.com/remorses/critique.git
+[submodule "context/hunk"]
+	path = context/hunk
+	url = https://github.com/modem-dev/hunk.git
+[submodule "context/gloomberb"]
+	path = context/gloomberb
+	url = https://github.com/vincelwt/gloomberb.git
+[submodule "context/ghui"]
+	path = context/ghui
+	url = https://github.com/kitlangton/ghui.git
+[submodule "context/termdraw"]
+	path = context/termdraw
+	url = https://github.com/benvinegar/termdraw.git
+[submodule "context/opentui-doom"]
+	path = context/opentui-doom
+	url = https://github.com/muhammedaksam/opentui-doom.git
+[submodule "context/glyph"]
+	path = context/glyph
+	url = https://github.com/semos-labs/glyph.git
+[submodule "context/rezi"]
+	path = context/rezi
+	url = https://github.com/RtlZeroMemory/Rezi.git
+[submodule "context/termui"]
+	path = context/termui
+	url = https://github.com/Arindam200/termui.git
+[submodule "context/react-curse"]
+	path = context/react-curse
+	url = https://github.com/infely/react-curse.git
+[submodule "context/melker"]
+	path = context/melker
+	url = https://github.com/wistrand/melker.git
+[submodule "context/effect"]
+	path = context/effect
+	url = https://github.com/Effect-TS/effect.git
+[submodule "context/clack"]
+	path = context/clack
+	url = https://github.com/bombshell-dev/clack.git
+[submodule "context/nberlette-tui"]
+	path = context/nberlette-tui
+	url = https://github.com/nberlette/tui.git
+[submodule "context/xterm"]
+	path = context/xterm
+	url = https://github.com/xtermjs/xterm.js.git
+[submodule "context/node-pty"]
+	path = context/node-pty
+	url = https://github.com/microsoft/node-pty.git
+[submodule "context/yoga"]
+	path = context/yoga
+	url = https://github.com/facebook/yoga.git
+[submodule "context/node-sixel"]
+	path = context/node-sixel
+	url = https://github.com/jerch/node-sixel.git
+[submodule "context/unicode-segmenter"]
+	path = context/unicode-segmenter
+	url = https://github.com/cometkim/unicode-segmenter.git
+[submodule "context/string-width"]
+	path = context/string-width
+	url = https://github.com/sindresorhus/string-width.git
+[submodule "context/ansi-up"]
+	path = context/ansi-up
+	url = https://github.com/drudru/ansi_up.git
+[submodule "context/anser"]
+	path = context/anser
+	url = https://github.com/IonicaBizau/anser.git
+[submodule "context/cli-spinners"]
+	path = context/cli-spinners
+	url = https://github.com/sindresorhus/cli-spinners.git
+[submodule "context/ansi-escapes"]
+	path = context/ansi-escapes
+	url = https://github.com/sindresorhus/ansi-escapes.git
+[submodule "context/get-east-asian-width"]
+	path = context/get-east-asian-width
+	url = https://github.com/sindresorhus/get-east-asian-width.git
+[submodule "context/inquirer"]
+	path = context/inquirer
+	url = https://github.com/SBoudrias/Inquirer.js.git
+[submodule "context/listr2"]
+	path = context/listr2
+	url = https://github.com/listr2/listr2.git
+[submodule "context/marked-terminal"]
+	path = context/marked-terminal
+	url = https://github.com/mikaelbr/marked-terminal.git
+[submodule "context/shiki"]
+	path = context/shiki
+	url = https://github.com/shikijs/shiki.git
+[submodule "context/cli-highlight"]
+	path = context/cli-highlight
+	url = https://github.com/felixfbecker/cli-highlight.git
+[submodule "context/cli-table3"]
+	path = context/cli-table3
+	url = https://github.com/cli-table/cli-table3.git
+[submodule "context/log-update"]
+	path = context/log-update
+	url = https://github.com/sindresorhus/log-update.git
+[submodule "context/asciichart"]
+	path = context/asciichart
+	url = https://github.com/kroitor/asciichart.git
+[submodule "context/boxen"]
+	path = context/boxen
+	url = https://github.com/sindresorhus/boxen.git
+[submodule "context/ansis"]
+	path = context/ansis
+	url = https://github.com/webdiscus/ansis.git
