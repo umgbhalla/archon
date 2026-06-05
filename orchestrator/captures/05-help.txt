@@ -1,0 +1,32 @@
+
+  ▟▙  archon  fleet · agent=claude
+      1 sessions · 0 need input · 0 working · 1 completed
+
+  Comple╭─Keyboard shortcuts──────────────────────────────────────────────────────────────╮
+    ✻ 1e│                                                                                 │    44s
+        │  Navigate                                                                       │
+        │    ↑ / ↓              Move between sessions                                     │
+        │    Enter / →          Attach to the selected session                            │
+        │    Enter              Dispatch a new session when the input has text            │
+        │                                                                                 │
+        │  Fleet                                                                          │
+        │    w                  Filter to sessions that need input (toggle)               │
+        │    Ctrl+X             Stop the selected session; press again within 2s to dele  │
+        │    Esc                Disarm a pending delete                                   │
+        │                                                                                 │
+        │  Attached view                                                                  │
+        │    Enter              Send the typed prompt to the attached session             │
+        │    ← / Esc / Ctrl+Z   Detach back to the grid                                   │
+        │                                                                                 │
+        │  General                                                                        │
+        │    ?                  Toggle this help                                          │
+        │    q / Esc            Exit to the shell (when the input is empty)               │
+        │    Ctrl+C             Clear the input, else exit                                │
+        │                                                                                 │
+        │                                                                                 │
+        ╰────────────────────────────────esc or ? to close────────────────────────────────╯
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+  ❯ describe a task for a new session
+  ────────────────────────────────────────────────────────────────────────────────────────────────
+  ↑/↓ select · enter/→ attach · ctrl+x stop · w needs-input · ? help · q exit
+  hud attached 1edd6ca8-3bb8-42ca-aec3-d05343ed405e
