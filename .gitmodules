@@ -209,3 +209,54 @@
 [submodule "context/ansis"]
 	path = context/ansis
 	url = https://github.com/webdiscus/ansis.git
+[submodule "context/ccmanager"]
+	path = context/ccmanager
+	url = https://github.com/kbwo/ccmanager.git
+[submodule "context/mux"]
+	path = context/mux
+	url = https://github.com/coder/mux.git
+[submodule "context/vibe-kanban"]
+	path = context/vibe-kanban
+	url = https://github.com/BloopAI/vibe-kanban.git
+[submodule "context/agent-of-empires"]
+	path = context/agent-of-empires
+	url = https://github.com/agent-of-empires/agent-of-empires.git
+[submodule "context/agent-kanban"]
+	path = context/agent-kanban
+	url = https://github.com/saltbo/agent-kanban.git
+[submodule "context/agent-orchestrator"]
+	path = context/agent-orchestrator
+	url = https://github.com/ComposioHQ/agent-orchestrator.git
+[submodule "context/rivet"]
+	path = context/rivet
+	url = https://github.com/Ironclad/rivet.git
+[submodule "context/jean"]
+	path = context/jean
+	url = https://github.com/coollabsio/jean.git
+[submodule "context/claude-squad"]
+	path = context/claude-squad
+	url = https://github.com/smtg-ai/claude-squad.git
+[submodule "context/ai-agent-board"]
+	path = context/ai-agent-board
+	url = https://github.com/DanWahlin/ai-agent-board.git
+[submodule "context/agentapi"]
+	path = context/agentapi
+	url = https://github.com/coder/agentapi.git
+[submodule "context/container-use"]
+	path = context/container-use
+	url = https://github.com/dagger/container-use.git
+[submodule "context/cmux"]
+	path = context/cmux
+	url = https://github.com/manaflow-ai/cmux.git
+[submodule "context/langflow"]
+	path = context/langflow
+	url = https://github.com/langflow-ai/langflow.git
+[submodule "context/recon"]
+	path = context/recon
+	url = https://github.com/gavraz/recon.git
+[submodule "context/sculptor"]
+	path = context/sculptor
+	url = https://github.com/imbue-ai/sculptor.git
+[submodule "context/vibecraft"]
+	path = context/vibecraft
+	url = https://github.com/rayzhudev/vibecraft.git
