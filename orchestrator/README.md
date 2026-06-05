@@ -12,13 +12,39 @@ It ships two surfaces:
   and streams the reply; subcommands manage agents and sessions.
 - a **fleet TUI** (OpenTUI/React) — a session grid grouped by logical state with
   a dual-channel status glyph (color = state, shape = liveness), a dispatch
-  input to spawn new sessions, and an attached view that streams an agent's ACP
-  updates live.
+  input to spawn new sessions, an attached view that streams an agent's ACP
+  updates live, filter-to-needs-input, and a Ctrl+X stop/delete chord.
+
+A per-user **supervisor daemon** owns the sessions (auto-started on demand) so
+they survive across CLI/TUI invocations and across daemon restarts; the CLI and
+TUI are thin clients over it (ADR-0004).
 
 Built with **Bun + TypeScript**. Strict typecheck, 66 unit/integration/e2e tests
 green. The end-to-end path is exercised in CI against a bundled credential-free
 **fake ACP agent**; real agents (`claude`, `gemini`) are wired by their known
 spawn specs but require their binaries + credentials and are not run in CI.
+
+---
+
+## Demo
+
+A keyboard-only walkthrough of the fleet TUI driven in a real PTY with
+[`termctrl`](../../context/terminal-control) (`--host opentui`) against the
+bundled `fake` agent. Stills are extracted deterministically from the recording
+(`termctrl save --recording … --at-marker`), not raced live `show` calls.
+
+- [`captures/archon-demo.mp4`](./captures/archon-demo.mp4) — captioned walkthrough
+  (dispatch → complete → attach + stream → help → filter → stop/delete → quit).
+- `captures/demo.termctrl` — recorded timeline (11 markers).
+- `captures/demo-edit.json` — marker-range edit plan (captions, holds).
+- `captures/NN-*.png` / `NN-*.txt` — one still per beat.
+
+Re-export the video:
+
+```bash
+termctrl video captures/demo.termctrl --edit captures/demo-edit.json \
+  --footer --hide-cursor --out captures/archon-demo.mp4
+```
 
 ---
 
@@ -63,13 +89,16 @@ is `bun run src/cli.ts …`.
 ```
 archon                          Open the fleet TUI (interactive TTY); prints help when piped/headless
 archon -p "<prompt>" [flags]    Run one prompt headless against an agent, stream the reply
+archon daemon                   Run the persistent supervisor daemon in the foreground
+archon daemon status            Report whether the daemon is running (pid + socket)
+archon daemon stop              Stop the running daemon
 archon agents [list]            List registered agent backends (use --json for machine output)
 archon agents add <name> -- <argv...>   Register a custom ACP agent in config
 archon agents remove <name>     Remove a config-registered agent (alias: rm)
-archon ls [--json]              List active sessions
-archon attach <id>              Attach to a running session
+archon ls [--json]              List live sessions (via the daemon)
+archon attach <id>              Attach to a running session and stream its updates
 archon stop <id>                Stop / cancel a running session
-archon logs <id>                Print a session's accumulated transcript
+archon logs <id>                Print a session's persisted transcript
 archon --version                Print version
 archon --help, -h               Show help
 ```
@@ -83,6 +112,7 @@ archon --help, -h               Show help
 | `--model <id>` | Model id, passed through where the backend supports it |
 | `--cwd <path>` | Working directory for the session (default: process cwd) |
 | `--permission-mode <mode>` | `default` \| `acceptEdits` \| `plan` \| `bypassPermissions` |
+| `--in-process` | Run the one-shot without the daemon (no persistence) — used by tests |
 
 `agents add` also takes `--project` to write the project config
 (`.archon/settings.json`) instead of the user config (`~/.archon/settings.json`).
@@ -108,6 +138,12 @@ bun run src/cli.ts -p "hi" --agent zed
 bun run src/cli.ts agents
 bun run src/cli.ts agents --json
 
+# daemon lifecycle (auto-started by ls/attach/stop/-p; explicit control too):
+bun run src/cli.ts daemon status
+bun run src/cli.ts ls                              # live sessions (via the daemon)
+bun run src/cli.ts logs <id>                       # persisted transcript
+bun run src/cli.ts daemon stop
+
 # open the fleet TUI (interactive terminal, >= ~24 rows):
 bun run src/cli.ts
 ```
@@ -115,6 +151,26 @@ bun run src/cli.ts
 When stdout is not a TTY (piped, redirected, in tests) bare `archon` prints help
 instead of opening the TUI, so scripts get deterministic text. Set `ARCHON_TUI=1`
 to force the TUI path.
+
+### Fleet TUI keys
+
+The `?` overlay is generated from the keymap (`src/tui/keymap.ts`), so it never
+drifts. The bindings:
+
+| key | action |
+|-----|--------|
+| `↑` / `↓` | Move selection between sessions |
+| type + `Enter` | Dispatch a new session (when the input has text) |
+| `Enter` / `→` | Attach to the selected session (when the input is empty) |
+| `w` | Toggle filter to sessions that need input |
+| `Ctrl+X` | Stop the selected session; press again within 2s to delete it |
+| `Esc` | Disarm a pending delete · clear the input · else exit |
+| `?` | Toggle the help overlay |
+| `q` | Exit to the shell (when the input is empty) |
+| `Ctrl+C` | Clear the input, else exit |
+
+In the **attached view**: type + `Enter` sends a prompt to that session; `←` /
+`Esc` / `Ctrl+Z` detach back to the grid; `?` toggles help.
 
 ---
 
@@ -221,10 +277,18 @@ src/
     types.ts        ArchonConfig / SettingsFile / permission + worktree modes + defaults
     load.ts         getConfig(): env > managed > project > user > defaults
     agents.ts       addAgent / removeAgent (write user or project settings.json)
-  core/       in-process supervisor + isolation
+  core/       supervisor + isolation
     session-manager.ts   SessionManager: createSession / prompt / cancel / setMode /
-                         remove / snapshot() + EventEmitter; logical state model
+                         remove / snapshot() + EventEmitter; logical state model;
+                         restore() recovers persisted sessions on daemon start
     worktree.ts          git-worktree isolation (lazy, per-session, opt-out)
+  daemon/     per-user supervisor daemon (ADR-0004)
+    server.ts       DaemonServer: owns the SessionManager, serves a 0600 unix socket,
+                    broadcasts session events to attached clients
+    client.ts       connectDaemon(): start-on-demand + reconnect; in-process fallback
+    protocol.ts     line-delimited JSON request/response + event frames + handshake
+    persistence.ts  FilePersistence: roster.json + per-session meta.json + transcript.log
+                    (atomic tmp+rename); roster recovery across restarts (ADR-0011)
   tui/        the fleet TUI (OpenTUI + React)
     index.tsx       runTui(): mount the renderer against a live SessionManager
     App.tsx         session grid (grouped by state, dual-channel glyph), dispatch
@@ -242,12 +306,15 @@ src/
 `AcpBackend` is the only concrete backend today; the interface leaves room for
 future HTTP (coder/agentapi) or direct-PTY backends without touching the UI.
 
-**Supervisor (`core/session-manager.ts`).** Owns sessions, normalizes the prompt
-stream, tracks logical state (`busy | waiting | idle | completed | failed |
-stopped`), and emits daemon-shaped events (`session_created` / `session_updated`
-/ `session_chunk` / `session_removed`, plus a catch-all `event`). The snapshot +
-event API is intentionally shaped so it can become an out-of-process daemon
-later without changing the TUI contract.
+**Supervisor (`core/session-manager.ts` + `daemon/`).** The `SessionManager` owns
+sessions, normalizes the prompt stream, tracks logical state (`busy | waiting |
+idle | completed | failed | stopped`), and emits daemon-shaped events
+(`session_created` / `session_updated` / `session_chunk` / `session_removed`,
+plus a catch-all `event`). It now runs **inside a per-user daemon** (`daemon/`,
+ADR-0004): the CLI and TUI connect over a `0600` unix socket (auto-starting the
+daemon on demand) and stream observed state. Sessions + transcripts are persisted
+(`daemon/persistence.ts`, ADR-0011) and recovered on daemon restart, so work
+survives the UI closing. An in-process fallback keeps tests + `--in-process` fast.
 
 **Worktree isolation (`core/worktree.ts`, ADR-0009).** By default, before a
 session's *first edit* (detected from the first `tool_call` in the stream),
@@ -262,9 +329,9 @@ data), renders sessions grouped by state with the dual-channel glyph, tracks
 selection by stable session id, and dispatches new sessions from the prompt
 input. Layout patterns are ported from the `mock/agent-view` reproduction.
 
-Relevant ADRs: 0001 (Bun/TS), 0002, 0003 (AgentBackend control plane), 0004
-(supervisor — in-process v1, daemon-shaped API), 0006 (session state model),
-0009 (git-worktree isolation).
+Relevant ADRs: 0001 (Bun/TS), 0003 (AgentBackend control plane), 0004
+(supervisor daemon — implemented), 0006 (session state model), 0008 (keymap),
+0009 (git-worktree isolation), 0011 (persistence — JSON-files variant).
 
 ---
 
@@ -280,18 +347,21 @@ Relevant ADRs: 0001 (Bun/TS), 0002, 0003 (AgentBackend control plane), 0004
   the four permission modes.
 - `SessionManager` lifecycle, state model, events, and lazy git-worktree
   isolation (real temp-repo integration test).
-- Fleet TUI mounts and renders against a live `SessionManager`; dispatch input
-  and attached streaming view are wired to the backend.
+- **Persistent supervisor daemon (ADR-0004)** — a per-user daemon over a `0600`
+  unix socket owns sessions; the CLI auto-starts it and reconnects. `archon ls`,
+  `attach`, `stop`, `logs`, `daemon status/stop` all work against it. Sessions +
+  transcripts persist to disk (`roster.json` + per-session files) and are
+  recovered on daemon restart — verified by a stop/start round-trip.
+- Fleet TUI mounts and renders against a live `SessionManager`: dispatch input,
+  attached streaming view, **filter-to-needs-input (`w`)**, the **Ctrl+X
+  stop-then-delete chord** (2s confirm), and a `?` help overlay generated from
+  the keymap — all wired to the backend. See the captioned demo below.
 - Strict typecheck clean; 66 tests green across 10 files (config, agents,
   transport, registry incl. agent-startup-error cases, worktree, session-manager,
   daemon round-trip + persistence-reload, tui, cli, e2e).
 
 **Stubbed / not done yet**
 
-- **Daemon is in-process (v1, ADR-0004).** There is no background supervisor, so
-  sessions do not persist across CLI invocations. `archon ls` always reports no
-  active sessions, and `attach` / `stop` / `logs` explain this and exit non-zero.
-  These commands exist as the stable shape the daemon will back later.
 - **Only the `fake` agent is exercised in CI.** `claude` / `gemini` are wired by
   their spawn specs and the client handshake is generic ACP, but they require the
   real binaries + credentials and are not run automatically.
@@ -299,9 +369,14 @@ Relevant ADRs: 0001 (Bun/TS), 0002, 0003 (AgentBackend control plane), 0004
   human for `session/request_permission`; the configured mode decides.
 - **`--model` is passed through only where a backend supports it**; the fake agent
   ignores it.
-- **TUI is observe + dispatch + attach**; richer fleet operations (filter-to-
-  waiting, review-before-merge with inline diff comments, the workflow
-  run-inspector surface) are future work.
+- **The workflow run-inspector surface is the next milestone (ADR-0005/0007).**
+  Today archon ships only the fleet/session-grid surface; the phase→agent tree
+  with per-span token/time metrics and live pause/resume/restart is not built.
+- **Review-before-merge** (inline diff-comments routed back to the agent,
+  ADR-0012) is not built yet.
+- **Persistence is the JSON-files variant** (`roster.json` + per-session
+  `meta.json`/`transcript.log`); the SQLite/relational store (ADR-0011) is
+  deferred behind the same `Persistence` interface.
 - Distributed as source, not a prebuilt binary — install with `bun link` (see [Install](#install)) or run via `bun run src/cli.ts`.
 
 ---

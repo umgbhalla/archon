@@ -89,3 +89,6 @@ Desktop.ini
 .node_repl_history
 tmp/
 temp/
+
+# Claude Code local overrides
+.claude/settings.local.json
