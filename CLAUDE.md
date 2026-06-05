@@ -9,7 +9,7 @@
 ## 0. What this repo is (and is not)
 
 - **Is:** a curated library of *other people's* code (as git submodules under `context/`), distilled study notes, a faithful UI mock, and a design-research corpus — all aimed at mastering TUI engineering and designing an orchestrator TUI.
-- **Is not:** a published product. There is no single app to ship yet. The only runnable code we authored lives in `mock/agent-view/app` (a scripted, non-functional mock).
+- **Is not (yet):** a published product. Two runnable things we authored: `mock/agent-view/app` (a scripted, non-functional mock) and `orchestrator/` (**archon** — a real ACP-based multi-agent orchestrator, v1).
 - **Anchor framework:** **OpenTUI** (`context/opentui`) — native Zig core + C-ABI + TS bindings (React/Solid), powers OpenCode. When building TUIs here, default to OpenTUI.
 
 ---
@@ -27,11 +27,12 @@ archon/
 │   ├── app/                  ← runnable: Bun + @opentui/react (keyboard-driven, non-functional)
 │   ├── captures/             ← termctrl evidence: stills, recording, captioned MP4
 │   └── TEST-REPORT.md
-└── research/orchestrator-tui/ ← 2025H2–2026 orchestration/visualization landscape
-    ├── LANDSCAPE.md           ← taxonomy, patterns-to-steal, gaps (START HERE for design)
-    ├── SUBMODULE-CANDIDATES.md
-    ├── README.md
-    └── RESEARCH/01..06.md
+├── research/orchestrator-tui/ ← 2025H2–2026 orchestration/visualization landscape
+│   ├── LANDSCAPE.md           ← taxonomy, patterns-to-steal, gaps (START HERE for design)
+│   ├── SUBMODULE-CANDIDATES.md · README.md · RESEARCH/01..06.md
+│   └── ADR/                   ← 15 MADR decisions (Tier-0 accepted) for the orchestrator
+└── orchestrator/              ← archon: REAL ACP-based multi-agent orchestrator (v1)
+    └── src/{acp,backend,config,core,tui} · cli.ts · docs/  (Bun+TS, 50 bun tests)
 ```
 
 **Three things to read before doing design work:**
@@ -106,7 +107,8 @@ Two **orthogonal surfaces** the tool should host (see `research/orchestrator-tui
   - Test: `bun test` (reducer/state-machine suite in `src/state/store.test.ts`).
   - Typecheck: `bunx tsc --noEmit`.
   - Architecture: `src/data` (types/seed/scenario) · `src/state` (store FSM + keymap) · `src/theme` · `src/components` · `App.tsx`. Selection is tracked **by stable key** (not index) — see `keepSelection`/`selectionKey`.
-- **New research** → `research/<topic>/` with a `README.md` index + `RESEARCH/NN-*.md` dossiers. **New distilled study** → `context/NOTES/`.
+- **The orchestrator** (`orchestrator/`, binary `archon`): Bun + TS + OpenTUI, ACP-based. Run: `cd orchestrator && bun install && bun test`; headless e2e: `bun run src/cli.ts -p "hi" --agent fake`. ACP via `@zed-industries/agent-client-protocol`; Claude-Code-like config (`~/.archon/settings.json`, `ARCHON_*` env, permission modes) + CLI (`-p`, `agents`, `ls/attach/stop/logs`). v1 gaps: supervisor is in-process (daemon-ready, ADR-0004); only the `fake` agent is exercised in CI; `archon` no-args prints help (TUI via `bun run src/tui/index.tsx`).
+- **New research** → `research/<topic>/` with a `README.md` index + `RESEARCH/NN-*.md` dossiers. **New distilled study** → `context/NOTES/`. **Architecture decisions** → `research/orchestrator-tui/ADR/` (forward) or `mock/agent-view/ADR/` (retroactive).
 
 ---
 
