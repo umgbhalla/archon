@@ -1,0 +1,40 @@
+
+  ▟▙  Claude Code v2.1.140
+  ▜▛  Opus 4.7 (1M context) · /Users/jane/code/web-app
+      2 awaiting input · 4 working · 4 completed
+  ╭────────────────────────────────────────────────────────────────────────────────────────────╮
+  │ clawd walk cycle                                                                 ✽ working │
+  │                                                                                            │     3
+  │ Most recent output                                                                         │    22
+  │ ──────────────────                                                                         │
+  │ Rendering frame 6/8 of walk cycle…                                                         │
+  │ Wrote assets/sprites/clawd-walk-f5.png                                                     │    2h
+  │ Write assets/sprites/clawd-walk.png                                                        │    5h
+  │                                                                                            │
+  │ ────────────────────────────────────────────────────────────────────────────────────────── │
+  │ ❯ type a reply · tab fills a suggested reply · ! to run a bash command                     │     1
+  │                                                                                            │     4
+  │ ↑/↓ peek adjacent · → attach · space/esc close                                             │
+  ╰────────────────────────────────────────────────────────────────────────────────────────────╯
+    ✽ collision detection      Edit src/physics/CollisionSystem.ts                                   2
+    ✽ tileset import           2/5 importing biome tilesets                                         30
+    ✢ playtest level 3         run 12 · all checkpoints cleared                                   in 4
+
+  Completed
+    ∙ water shader             error: GLSL compile failed (line 42)                                  1
+    ✻ title screen             result: menu, options, and credits done                               9
+    … 2 more
+
+
+
+
+
+
+
+
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  ❯ describe a task for a new session
+  ────────────────────────────────────────────────────────────────────────────────────────────────────
+  enter to open · space to reply · ctrl+x to delete · n next scenario · ? for shortcuts
+  hud ready · press n to advance scenario · ? for shortcuts  (0/10)
