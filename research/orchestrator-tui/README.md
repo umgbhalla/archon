@@ -17,6 +17,7 @@ By 2026-H1 the orchestrator-agent space has converged on a clear stack: **worktr
 | [`RESEARCH/03-thirdparty-orchestrators.md`](./RESEARCH/03-thirdparty-orchestrators.md) | Third-party orchestrators/visualizers grouped by UI paradigm (TUI-list, kanban, web, IDE, tmux). |
 | [`RESEARCH/04-dag-workflow-viz.md`](./RESEARCH/04-dag-workflow-viz.md) | DAG / workflow / graph visualization — how run inspectors show node graphs, timelines, trace trees, swimlanes. |
 | [`RESEARCH/05-bleeding-edge-2026.md`](./RESEARCH/05-bleeding-edge-2026.md) | Newest/novel tools (late 2025 – mid 2026): affect layers, cryptographic identity, tiered autonomy, novel metaphors. |
+| [`RESEARCH/06-dynamic-workflows.md`](./RESEARCH/06-dynamic-workflows.md) | **Workflow-as-code** paradigm: Claude Code Dynamic Workflows (`/workflows` run-inspector TUI) + Codex-Workflows port (MCP/QuickJS runtime + dashboard). The terminal run-inspector model. |
 
 ## Top ~8 tools to know
 
@@ -28,6 +29,7 @@ By 2026-H1 the orchestrator-agent space has converged on a clear stack: **worktr
 6. [smtg-ai/claude-squad](https://github.com/smtg-ai/claude-squad) — most mature session-list TUI over tmux (Go/Bubble Tea) with a review-diff-before-push gate baked in.
 7. [Ironclad/rivet](https://github.com/Ironclad/rivet) — the DAG/graph renderer reference: remote live debugger (attach to a running execution and stream node activity) + Auto Layout.
 8. [gavraz/recon](https://github.com/gavraz/recon) — zero-instrumentation status detection (reads agent JSONL + tmux pane text, unmodified agents) plus a Tamagotchi affect layer.
+9. [Claude Code Dynamic Workflows](https://code.claude.com/docs/en/workflows) + [robzilla1738/Codex-Workflows](https://github.com/robzilla1738/Codex-Workflows) — **workflow-as-code** run inspectors: the `/workflows` phase→agent tree (token/time, drill-in, pause/resume/restart/save) and its open Codex port (MCP server + QuickJS-isolated runtime + durable storage).
 
 ## 5 strongest patterns to steal
 

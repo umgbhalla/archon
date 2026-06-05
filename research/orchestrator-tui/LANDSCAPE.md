@@ -158,3 +158,27 @@ Desktop/web: `stravu/crystal`→Nimbalyst, `imbue-ai/sculptor`, `coder/mux`, `om
 Infra: `dagger/container-use`, `coder/agentapi`, `musistudio/claude-code-router`, `parruda/swarm`, `ruvnet/claude-flow`→ruflo, `Iamshankhadeep/ccseva`, `Owloops/claude-powerline`.
 DAG-viz: `langchain-ai/langgraph`(+Studio/LangSmith), `langflow-ai/langflow`, `FlowiseAI/Flowise`, `crewAIInc/crewAI`, `microsoft/autogen` 🔴maint, `n8n-io/n8n`, `temporalio/temporal`, `dagster-io/dagster`, `Ironclad/rivet` 🟡, `decisiongraph/graphs-tui`.
 TUI primitives: Ratatui (Canvas + Braille U+2800–U+28FF), Textual (`Tree`), gotui/termui.
+
+
+---
+
+## Addendum — the workflow-as-code paradigm (see RESEARCH/06)
+
+The taxonomy above covers tools where the human (or a lead agent) drives turn by turn.
+A second axis exists: **workflow-as-code**, where the plan is a script and the UI is a
+**run inspector** rather than a session grid.
+
+- **Claude Code Dynamic Workflows** (`/workflows`) — first-party. Script (`agent/parallel/
+  pipeline/phase/budget`) runs in an isolated background runtime; the TUI shows a
+  **phase → agent tree** with agent-count / token-total / elapsed-time, drill-in to each
+  agent's prompt + tool calls + result, and live `p` pause/resume · `x` stop · `r` restart ·
+  `s` save-as-command. Resumable via a journal (completed agents return cached results).
+- **Codex-Workflows** (robzilla1738, `context/codex-workflows`) — open Codex port: MCP server
+  + **QuickJS-isolated** script runtime + durable storage under `$CODEX_HOME`, with the same
+  dashboard controls (64 concurrent / 2000 agents, per-phase model routing).
+
+**Implication for the orchestrator TUI:** host BOTH surfaces — a fleet/session grid
+("which agent needs me?") AND a workflow run-inspector ("what is this orchestrated job
+doing, phase by phase?"). The run-inspector tree+metrics+drill-in directly fills the
+terminal-native-run-inspection and cost/quota gaps named above; Codex-Workflows is the most
+readable open implementation to study, CC's `/workflows` is the UX spec.

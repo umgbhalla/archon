@@ -260,3 +260,6 @@
 [submodule "context/vibecraft"]
 	path = context/vibecraft
 	url = https://github.com/rayzhudev/vibecraft.git
+[submodule "context/codex-workflows"]
+	path = context/codex-workflows
+	url = https://github.com/robzilla1738/Codex-Workflows.git
