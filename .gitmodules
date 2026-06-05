@@ -1,0 +1,90 @@
+[submodule "context/agents"]
+	path = context/agents
+	url = https://github.com/cloudflare/agents.git
+[submodule "context/sandbox-sdk"]
+	path = context/sandbox-sdk
+	url = https://github.com/cloudflare/sandbox-sdk.git
+[submodule "context/scout"]
+	path = context/scout
+	url = https://github.com/agno-agi/scout.git
+[submodule "context/ai-elements"]
+	path = context/ai-elements
+	url = https://github.com/vercel/ai-elements
+[submodule "context/claw-nano-claw"]
+	path = context/claw-nano-claw
+	url = https://github.com/hustcc/nano-claw
+[submodule "context/claw-nanoclaw"]
+	path = context/claw-nanoclaw
+	url = https://github.com/nanocoai/nanoclaw
+[submodule "context/claw-tinyclaw"]
+	path = context/claw-tinyclaw
+	url = https://github.com/warengonzaga/tinyclaw
+[submodule "context/claw-microclaw"]
+	path = context/claw-microclaw
+	url = https://github.com/microclaw/microclaw
+[submodule "context/prompt-kit"]
+	path = context/prompt-kit
+	url = https://github.com/ibelick/prompt-kit
+[submodule "context/kimiflare"]
+	path = context/kimiflare
+	url = https://github.com/sinameraji/kimiflare
+[submodule "context/heroui"]
+	path = context/heroui
+	url = https://github.com/heroui-inc/heroui
+[submodule "context/flue"]
+	path = context/flue
+	url = https://github.com/withastro/flue
+[submodule "context/alchemy-effect"]
+	path = context/alchemy-effect
+	url = https://github.com/alchemy-run/alchemy-effect
+[submodule "context/effect-smol"]
+	path = context/effect-smol
+	url = https://github.com/Effect-TS/effect-smol
+[submodule "context/quickjs-wasi"]
+	path = context/quickjs-wasi
+	url = https://github.com/vercel-labs/quickjs-wasi
+[submodule "context/quickjs-ng"]
+	path = context/quickjs-ng
+	url = https://github.com/quickjs-ng/quickjs
+[submodule "context/boa"]
+	path = context/boa
+	url = https://github.com/boa-dev/boa
+[submodule "context/rustpython"]
+	path = context/rustpython
+	url = https://github.com/RustPython/RustPython
+[submodule "context/workers-rs"]
+	path = context/workers-rs
+	url = https://github.com/cloudflare/workers-rs
+[submodule "context/rivetkit"]
+	path = context/rivetkit
+	url = https://github.com/rivet-gg/rivetkit
+[submodule "context/perry"]
+	path = context/perry
+	url = https://github.com/PerryTS/perry
+[submodule "context/wizer"]
+	path = context/wizer
+	url = https://github.com/bytecodealliance/wizer
+[submodule "context/dynos"]
+	path = context/dynos
+	url = https://github.com/threepointone/dynos
+[submodule "context/beautiful-mermaid"]
+	path = context/beautiful-mermaid
+	url = https://github.com/lukilabs/beautiful-mermaid.git
+[submodule "context/engram"]
+	path = context/engram
+	url = git@github.com:umgbhalla/engram.git
+[submodule "context/thinkx"]
+	path = context/thinkx
+	url = git@github.com:zonko-ai/thinkx.git
+[submodule "context/fast-rlm"]
+	path = context/fast-rlm
+	url = https://github.com/avbiswas/fast-rlm.git
+[submodule "context/opentui"]
+	path = context/opentui
+	url = https://github.com/anomalyco/opentui.git
+[submodule "context/terminal-control"]
+	path = context/terminal-control
+	url = https://github.com/kitlangton/terminal-control.git
+[submodule "context/termcast"]
+	path = context/termcast
+	url = https://github.com/remorses/termcast
