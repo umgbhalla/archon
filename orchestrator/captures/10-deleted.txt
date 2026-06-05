@@ -1,0 +1,40 @@
+
+  ▟▙  archon  fleet · agent=fake
+      0 sessions · 0 need input · 0 working · 0 completed
+
+
+    No sessions yet.
+    Type a task below and press Enter to dispatch a new agent session.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ❯ describe a task for a new session
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ↑/↓ select · enter/→ attach · ctrl+x stop · w needs-input · ? help · q exit
+  hud deleted fake-session-1

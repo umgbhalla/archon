@@ -18,7 +18,7 @@ export {
   ndJsonStream,
   RequestError,
   PROTOCOL_VERSION,
-} from "@zed-industries/agent-client-protocol";
+} from "@agentclientprotocol/sdk";
 
 export type {
   // connection role interfaces
@@ -52,7 +52,7 @@ export type {
   // capabilities
   ClientCapabilities,
   AgentCapabilities,
-} from "@zed-industries/agent-client-protocol";
+} from "@agentclientprotocol/sdk";
 
 /** The `stopReason` values an ACP prompt turn can end with. */
 export type StopReason =

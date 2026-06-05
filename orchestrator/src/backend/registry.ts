@@ -3,7 +3,7 @@
  *
  * Built-in entries cover the real ACP agents people actually run:
  *   - "fake"    — bundled standalone ACP test agent (the only no-setup entry).
- *   - "claude"  — Claude Code over ACP via Zed's adapter (npx @zed-industries/claude-code-acp).
+ *   - "claude"  — Claude Code over ACP via the official adapter (npx @agentclientprotocol/claude-agent-acp).
  *   - "gemini"  — Gemini CLI in experimental ACP mode (gemini --experimental-acp).
  *   - "generic" — any ACP agent; the command is supplied at runtime via --acp-cmd.
  *
@@ -55,7 +55,7 @@ export const AGENT_REGISTRY: Record<string, AgentSpec> = {
   claude: {
     name: "claude",
     description: "Claude Code over ACP (Zed adapter).",
-    command: ["npx", "-y", "@zed-industries/claude-code-acp"],
+    command: ["npx", "-y", "@agentclientprotocol/claude-agent-acp"],
     runnable: false,
     source: "builtin",
     notes:
@@ -64,7 +64,7 @@ export const AGENT_REGISTRY: Record<string, AgentSpec> = {
     authEnv: ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"],
     setupHint:
       "Install Node.js (provides npx). Authenticate with ANTHROPIC_API_KEY " +
-      "(or CLAUDE_CODE_OAUTH_TOKEN). First run downloads @zed-industries/claude-code-acp via npx.",
+      "(or CLAUDE_CODE_OAUTH_TOKEN). First run downloads @agentclientprotocol/claude-agent-acp via npx.",
   },
   gemini: {
     name: "gemini",
@@ -79,6 +79,80 @@ export const AGENT_REGISTRY: Record<string, AgentSpec> = {
     setupHint:
       "Install the Gemini CLI (npm i -g @google/gemini-cli) so `gemini` is on PATH, " +
       "then authenticate (GEMINI_API_KEY, or `gemini` interactive login).",
+  },
+  codex: {
+    name: "codex",
+    description: "OpenAI Codex over ACP via Zed's official adapter.",
+    command: ["npx", "-y", "@zed-industries/codex-acp"],
+    runnable: false,
+    source: "builtin",
+    notes:
+      "Codex via @zed-industries/codex-acp: streaming text, tool calls + permission " +
+      "requests, edit review, session modes, loadSession. The locally installed `codex` " +
+      "binary is NOT ACP — the adapter supplies ACP itself. Terminal cmds run non-PTY.",
+    authEnv: ["OPENAI_API_KEY", "CODEX_API_KEY"],
+    setupHint:
+      "Install Node (npx). Authenticate with OPENAI_API_KEY or CODEX_API_KEY, or `codex login` " +
+      "(ChatGPT subscription; not for remote/headless). First run downloads @zed-industries/codex-acp via npx.",
+  },
+  goose: {
+    name: "goose",
+    description: "Block's Goose agent in native ACP mode.",
+    command: ["goose", "acp"],
+    runnable: false,
+    source: "builtin",
+    notes: "Native ACP (agent + client). Configure providers via `goose configure`.",
+    authEnv: ["GOOSE_PROVIDER", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"],
+    setupHint: "Install Goose (block/goose) so `goose` is on PATH, then `goose configure`.",
+  },
+  opencode: {
+    name: "opencode",
+    description: "opencode (sst) in native ACP mode.",
+    command: ["opencode", "acp"],
+    runnable: false,
+    source: "builtin",
+    notes: "Native ACP. /undo and /redo are unsupported over ACP.",
+    authEnv: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"],
+    setupHint: "Install opencode so `opencode` is on PATH, then `opencode auth login`.",
+  },
+  copilot: {
+    name: "copilot",
+    description: "GitHub Copilot CLI in native ACP mode (public preview).",
+    command: ["copilot", "--acp"],
+    runnable: false,
+    source: "builtin",
+    notes: "Native ACP, preview since 2026-01. Requires a GitHub Copilot subscription.",
+    authEnv: ["GITHUB_TOKEN"],
+    setupHint: "Install @github/copilot (npm i -g @github/copilot) + authenticate via gh / Copilot sub.",
+  },
+  qwen: {
+    name: "qwen",
+    description: "Qwen Code in native ACP mode (Node >= 22).",
+    command: ["qwen", "--acp"],
+    runnable: false,
+    source: "builtin",
+    notes: "Native ACP v1. Legacy --experimental-acp is deprecated; use --acp.",
+    authEnv: ["OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_MODEL"],
+    setupHint: "Install @qwen-code/qwen-code (npm i -g) so `qwen` is on PATH; set OPENAI_API_KEY or use Qwen OAuth.",
+  },
+  cursor: {
+    name: "cursor",
+    description: "Cursor agent CLI in native ACP mode.",
+    command: ["cursor-agent", "acp"],
+    runnable: false,
+    source: "builtin",
+    notes: "Native ACP. No session/load — resume is unavailable for this agent.",
+    setupHint: "Install via cursor.com/install so `cursor-agent` is on PATH, then `cursor-agent login`.",
+  },
+  amp: {
+    name: "amp",
+    description: "Sourcegraph Amp via the community acp-amp bridge (tier-2).",
+    command: ["npx", "-y", "@superagenticai/acp-amp", "run"],
+    runnable: false,
+    source: "builtin",
+    notes: "Community ACP bridge (not native). Requires paid Amp credits; best-effort.",
+    authEnv: ["AMP_API_KEY"],
+    setupHint: "Requires a paid Amp account/credits. Uses the @superagenticai/acp-amp bridge via npx.",
   },
   generic: {
     name: "generic",

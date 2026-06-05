@@ -1,0 +1,40 @@
+
+  ▟▙  archon  fleet · agent=fake   [filter: needs-input]
+      1 sessions · 0 need input · 0 working · 1 completed
+
+
+    No sessions need input right now.
+    Press w to show all sessions.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ❯ describe a task for a new session
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+  w all · enter/→ attach · ctrl+x stop · ? help · q exit
+  hud turn done fake-session-1

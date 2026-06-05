@@ -7,8 +7,8 @@
  * session/request_permission, fs/read|write). We own the process lifecycle.
  */
 import { spawn, type Subprocess } from "bun";
-import { ClientSideConnection, ndJsonStream } from "@zed-industries/agent-client-protocol";
-import type { Client } from "@zed-industries/agent-client-protocol";
+import { ClientSideConnection, ndJsonStream } from "@agentclientprotocol/sdk";
+import type { Client } from "@agentclientprotocol/sdk";
 
 export interface SpawnAgentOptions {
   /** Executable + args, e.g. ["bun", "run", "fake-acp-agent.ts"] or ["gemini", "--experimental-acp"]. */
@@ -73,7 +73,7 @@ function sinkToWritable(stdin: import("bun").FileSink): WritableStream<Uint8Arra
  */
 export function spawnAcpAgent(
   opts: SpawnAgentOptions,
-  toClient: (agent: import("@zed-industries/agent-client-protocol").Agent) => Client,
+  toClient: (agent: import("@agentclientprotocol/sdk").Agent) => Client,
 ): AgentProcess {
   const [cmd, ...args] = opts.command;
   if (!cmd) throw new Error("spawnAcpAgent: empty command");

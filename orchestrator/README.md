@@ -15,7 +15,7 @@ It ships two surfaces:
   input to spawn new sessions, and an attached view that streams an agent's ACP
   updates live.
 
-Built with **Bun + TypeScript**. Strict typecheck, 58 unit/integration/e2e tests
+Built with **Bun + TypeScript**. Strict typecheck, 66 unit/integration/e2e tests
 green. The end-to-end path is exercised in CI against a bundled credential-free
 **fake ACP agent**; real agents (`claude`, `gemini`) are wired by their known
 spawn specs but require their binaries + credentials and are not run in CI.
@@ -33,7 +33,7 @@ straight from TypeScript via Bun.
 
 ```bash
 bunx tsc --noEmit   # typecheck (strict, clean)
-bun test            # 58 tests across 10 files
+bun test            # 66 tests across 10 files
 ```
 
 ### Run it as `archon` (global install)
@@ -101,7 +101,7 @@ bun run src/cli.ts -p "summarize README.md" --agent claude
 bun run src/cli.ts -p "hi" --agent generic --acp-cmd "my-agent --acp"
 
 # register a custom agent in user config, then use it by name:
-bun run src/cli.ts agents add zed -- npx -y @zed-industries/claude-code-acp
+bun run src/cli.ts agents add zed -- npx -y @agentclientprotocol/claude-agent-acp
 bun run src/cli.ts -p "hi" --agent zed
 
 # list agents (human / JSON):
@@ -139,7 +139,7 @@ env vars  >  managed  >  project (.archon/settings.json)  >  user (~/.archon/set
   "defaultModel": "claude-sonnet-4",   // optional model id
   "permissionMode": "default",         // default | acceptEdits | plan | bypassPermissions
   "agents": {                          // extra named ACP agents: name -> argv
-    "zed": ["npx", "-y", "@zed-industries/claude-code-acp"]
+    "zed": ["npx", "-y", "@agentclientprotocol/claude-agent-acp"]
   },
   "worktree": {                        // git-worktree isolation (ADR-0009)
     "bgIsolation": "worktree",         // "worktree" (default) | "none"
@@ -190,7 +190,7 @@ clear, hinted error if the launcher binary is missing from `PATH`.
 | name | spawn command | runnable here | notes |
 |------|---------------|---------------|-------|
 | `fake` | `bun run src/testing/fake-acp-agent.ts` | yes | Deterministic 3-chunk reply + `end_turn`; supports cancel. No model/network. Used by e2e + smokes. |
-| `claude` | `npx -y @zed-industries/claude-code-acp` | needs setup | Full Claude Code over ACP (Zed adapter): streaming text + thoughts, tool calls, fs read/write, plan, session modes. Needs Node/npx + Anthropic auth. |
+| `claude` | `npx -y @agentclientprotocol/claude-agent-acp` | needs setup | Full Claude Code over ACP (Zed adapter): streaming text + thoughts, tool calls, fs read/write, plan, session modes. Needs Node/npx + Anthropic auth. |
 | `gemini` | `gemini --experimental-acp` | needs setup | Gemini CLI in experimental ACP mode over stdio. Streaming text + tool calls. ACP support is experimental. |
 | `generic` | *(supplied via `--acp-cmd`)* | needs setup | Escape hatch — any ACP-over-stdio agent. Supply the launch argv with `--acp-cmd`. |
 
@@ -282,9 +282,9 @@ Relevant ADRs: 0001 (Bun/TS), 0002, 0003 (AgentBackend control plane), 0004
   isolation (real temp-repo integration test).
 - Fleet TUI mounts and renders against a live `SessionManager`; dispatch input
   and attached streaming view are wired to the backend.
-- Strict typecheck clean; 58 tests green across 10 files (config, agents,
+- Strict typecheck clean; 66 tests green across 10 files (config, agents,
   transport, registry incl. agent-startup-error cases, worktree, session-manager,
-  daemon, tui, cli, e2e).
+  daemon round-trip + persistence-reload, tui, cli, e2e).
 
 **Stubbed / not done yet**
 
@@ -311,8 +311,23 @@ Relevant ADRs: 0001 (Bun/TS), 0002, 0003 (AgentBackend control plane), 0004
 ```bash
 bun install
 bunx tsc --noEmit                                 # typecheck
-bun test                                          # 58 tests
+bun test                                          # 66 tests
 bun run src/cli.ts -p "hello" --agent fake        # headless e2e: "Hello from the fake ACP agent!"
 ARCHON_TUI=1 bun run src/cli.ts                   # force the fleet TUI
 bun run src/cli.ts agents --json                  # registry
 ```
+
+
+## Verified real integrations (2026-06-05)
+
+Proven end-to-end through `archon -p` (a real model reply, not the fake control string):
+
+| Agent | Command | Result | Auth used |
+|-------|---------|--------|-----------|
+| `claude` | `archon -p "reply with exactly BANANA" --agent claude` | `BANANA` | `ANTHROPIC_API_KEY` |
+| `codex` | `archon -p "what is 17*23? number only" --agent codex` | `391` | `codex login` (ChatGPT sub) |
+| `fake` | `archon -p "ping" --agent fake` | `Hello from the fake ACP agent!` | none (control) |
+
+`gemini --experimental-acp` is wired but the local gemini binary crashes on import (Node ESM/telemetry bug) — archon surfaces the actionable setup hint rather than failing opaquely.
+
+Regression test: `ARCHON_TEST_REAL=1 ANTHROPIC_API_KEY=... bun test real-integration` (gated; default `bun test` skips it and stays green offline).

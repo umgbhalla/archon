@@ -1,0 +1,14 @@
+{
+  "clips": [
+    { "from": "01-launch", "to": "02-dispatch-typed", "caption": "archon — the fleet TUI (agent=fake), empty grid" },
+    { "from": "02-dispatch-typed", "to": "03-completed", "caption": "Dispatch a task: type a prompt for a new session" },
+    { "from": "03-completed", "to": "04-attached", "caption": "Enter runs it on the ACP agent — session completes", "hold_ms": 1100 },
+    { "from": "04-attached", "to": "05-attached-stream", "caption": "Attach (down then Enter): the streamed agent reply", "hold_ms": 1300 },
+    { "from": "05-attached-stream", "to": "06-detached", "caption": "Send a follow-up prompt — streams live in the attached view", "hold_ms": 1300 },
+    { "from": "06-detached", "to": "07-help", "caption": "Esc detaches back to the grid" },
+    { "from": "07-help", "to": "08-filter-waiting", "caption": "? — keyboard shortcuts (generated from the keymap)", "hold_ms": 1600 },
+    { "from": "08-filter-waiting", "to": "09-stop-armed", "caption": "w — filter to sessions that need input", "hold_ms": 1200 },
+    { "from": "09-stop-armed", "to": "10-deleted", "caption": "Ctrl+X stops the session and arms a 2s delete confirm", "hold_ms": 1700 },
+    { "from": "10-deleted", "to": "11-quit", "caption": "Ctrl+X again within 2s — session removed", "hold_ms": 1200 }
+  ]
+}

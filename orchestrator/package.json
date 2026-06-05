@@ -21,9 +21,9 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "^0.25.0",
     "@opentui/core": "^0.3.2",
     "@opentui/react": "^0.3.2",
-    "@zed-industries/agent-client-protocol": "^0.4.5",
     "react": "^19"
   }
 }

@@ -1,7 +1,7 @@
 # Agents — supported ACP backends & how to add one
 
 archon drives **coding agents over [ACP](https://agentclientprotocol.com)** (the Agent
-Client Protocol) using the official `@zed-industries/agent-client-protocol` SDK. Any
+Client Protocol) using the official `@agentclientprotocol/sdk` SDK. Any
 program that speaks ACP over stdio can be an archon backend — archon spawns it, runs the
 `initialize → session/new → prompt` handshake, and streams normalized updates back to the
 session manager / TUI.
@@ -21,7 +21,7 @@ clear error (with a setup hint) if the launcher binary is missing from `PATH`.
 | name      | spawn command                              | runnable | auth env (passed through if set)                                  |
 |-----------|--------------------------------------------|----------|-------------------------------------------------------------------|
 | `fake`    | `bun run src/testing/fake-acp-agent.ts`    | yes      | —                                                                 |
-| `claude`  | `npx -y @zed-industries/claude-code-acp`   | needs setup | `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN` |
+| `claude`  | `npx -y @agentclientprotocol/claude-agent-acp`   | needs setup | `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN` |
 | `gemini`  | `gemini --experimental-acp`                | needs setup | `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `GOOGLE_GENAI_USE_VERTEXAI`   |
 | `generic` | *(supplied via `--acp-cmd`)*               | needs setup | —                                                                 |
 
@@ -45,7 +45,7 @@ export ANTHROPIC_API_KEY=sk-...            # or CLAUDE_CODE_OAUTH_TOKEN
 bun run src/cli.ts -p "summarize README" --agent claude --cwd /path/to/repo
 ```
 
-The first invocation downloads `@zed-industries/claude-code-acp` via `npx`.
+The first invocation downloads `@agentclientprotocol/claude-agent-acp` via `npx`.
 
 ### `gemini` — Gemini CLI in experimental ACP mode
 Google's Gemini CLI speaking ACP over stdio (`gemini --experimental-acp`). Streaming text +
@@ -106,7 +106,7 @@ Persist a named agent to your settings file so you can use `--agent <name>` anyw
 
 ```sh
 # user scope (~/.archon/settings.json, or $ARCHON_CONFIG_DIR/settings.json)
-archon agents add zed -- npx -y @zed-industries/claude-code-acp
+archon agents add zed -- npx -y @agentclientprotocol/claude-agent-acp
 
 # project scope (<cwd>/.archon/settings.json)
 archon agents add myteam --project -- my-agent --acp
@@ -122,7 +122,7 @@ Resulting `settings.json`:
 ```json
 {
   "agents": {
-    "zed": ["npx", "-y", "@zed-industries/claude-code-acp"]
+    "zed": ["npx", "-y", "@agentclientprotocol/claude-agent-acp"]
   }
 }
 ```

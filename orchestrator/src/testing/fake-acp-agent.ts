@@ -17,7 +17,7 @@ import {
   AgentSideConnection,
   ndJsonStream,
   PROTOCOL_VERSION,
-} from "@zed-industries/agent-client-protocol";
+} from "@agentclientprotocol/sdk";
 import type {
   Agent,
   AgentSideConnection as AgentConn,
@@ -30,7 +30,7 @@ import type {
   CancelNotification,
   AuthenticateRequest,
   AuthenticateResponse,
-} from "@zed-industries/agent-client-protocol";
+} from "@agentclientprotocol/sdk";
 
 /** The reply chunks the fake agent streams for any prompt. */
 export const FAKE_CHUNKS = ["Hello", " from", " the fake ACP agent!"] as const;

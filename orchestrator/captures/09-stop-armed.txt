@@ -1,0 +1,40 @@
+
+  ▟▙  archon  fleet · agent=fake
+      1 sessions · 0 need input · 0 working · 0 completed
+
+      Stopped  (1)
+  ╭──────────────────────────────────────────────────────────────────────╮                                 ⌫
+  │                                                                      │
+  │ ⚠ stopped · press Ctrl+X again within 2s to delete                   │
+  │ target: "fake-session-1"                                             │
+  │ esc to keep (stays stopped) · auto-disarms in 2s                     │
+  │                                                                      │
+  ╰──────────────────────────────────────────────────────────────────────╯
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ❯ describe a task for a new session
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ctrl+x delete · esc keep · ↑/↓ select
+  hud stopped fake-session-1 · Ctrl+X again to delete

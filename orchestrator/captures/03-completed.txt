@@ -1,0 +1,40 @@
+
+  ▟▙  archon  fleet · agent=fake
+      1 sessions · 0 need input · 0 working · 1 completed
+
+      Completed  (1)
+        ✻ fake-session-1   Hello from the fake ACP agent!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ❯ describe a task for a new session
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ↑/↓ select · enter/→ attach · ctrl+x stop · w needs-input · ? help · q exit
+  hud session fake-session-1 done

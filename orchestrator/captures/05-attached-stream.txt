@@ -1,0 +1,40 @@
+
+  ▟▙  fake-session-1  fake · /Users/umang/hub/zonko/archon/orchestrator   attached ✻ completed
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵ Hello from the fake ACP agent!Hello from the fake ACP agent!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+  > send a prompt to this session
+  enter send · ← / esc / ctrl+z detach · ? help

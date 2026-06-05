@@ -13,7 +13,7 @@ test("built-in registry has claude/gemini/generic with spawn specs + notes", () 
   expect(AGENT_REGISTRY.claude!.command).toEqual([
     "npx",
     "-y",
-    "@zed-industries/claude-code-acp",
+    "@agentclientprotocol/claude-agent-acp",
   ]);
   expect(AGENT_REGISTRY.gemini!.command).toEqual(["gemini", "--experimental-acp"]);
   expect(AGENT_REGISTRY.generic!.command).toEqual([]);
@@ -91,7 +91,9 @@ test("AcpBackend.connect surfaces an actionable error when the agent exits durin
     await be.dispose();
   }
   expect(msg).toMatch(/failed to start/);
-  expect(msg).toMatch(/exited \(code 3\)/);
+  // SDK 0.25 surfaces a closed connection during handshake rather than the raw
+  // exit code; the actionable signal is the captured agent stderr + the hint.
+  expect(msg).toMatch(/handshake failed|exited|connection closed/i);
   // captured stderr tail is included so the user sees the real cause.
   expect(msg).toMatch(/BOOM_FROM_AGENT/);
   // generic's setup hint is appended.
@@ -114,4 +116,12 @@ test("AcpBackend.connect surfaces a clear error when the binary cannot be spawne
     await be.dispose();
   }
   expect(msg).toMatch(/failed to start/);
+});
+
+test("registry ships renamed claude adapter + codex adapter", () => {
+  expect(getAgentSpec("claude")?.command.at(-1)).toBe("@agentclientprotocol/claude-agent-acp");
+  expect(getAgentSpec("codex")?.command.at(-1)).toBe("@zed-industries/codex-acp");
+  for (const k of ["gemini", "goose", "opencode", "copilot", "qwen", "cursor", "amp"]) {
+    expect(getAgentSpec(k)).toBeDefined();
+  }
 });

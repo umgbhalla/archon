@@ -65,7 +65,7 @@ All keys are optional in a file; unset keys fall through to the layer below.
   // Also writable via `archon agents add <name> -- <argv...>`.
   "agents": {
     "myagent": ["my-agent-bin", "--acp"],
-    "zed": ["npx", "-y", "@zed-industries/claude-code-acp"]
+    "zed": ["npx", "-y", "@agentclientprotocol/claude-agent-acp"]
   },
 
   // Git-worktree isolation (ADR-0009). See §6.
