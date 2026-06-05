@@ -36,16 +36,22 @@ function Header({ sessions }: { sessions: Session[] }) {
   const summary = `${awaiting} awaiting input · ${working} working · ${completed} completed`
   return (
     <box flexDirection="column" paddingLeft={2} paddingTop={1}>
-      <text>
-        <span fg={c.claude} attributes={TextAttributes.BOLD}>{"▟▙  "}</span>
-        <span fg={c.fg} attributes={TextAttributes.BOLD}>Claude Code</span>
-        <span fg={c.fgDim}>{" v2.1.140"}</span>
-      </text>
-      <text>
-        <span fg={c.claude}>{"▜▛  "}</span>
-        <span fg={c.fgDim}>{"Opus 4.7 (1M context) · /Users/jane/code/web-app"}</span>
-      </text>
-      <text fg={c.fgDim}>{`    ${summary}`}</text>
+      <box height={1}>
+        <text>
+          <span fg={c.claude} attributes={TextAttributes.BOLD}>{"▟▙  "}</span>
+          <span fg={c.fg} attributes={TextAttributes.BOLD}>Claude Code</span>
+          <span fg={c.fgDim}>{" v2.1.140"}</span>
+        </text>
+      </box>
+      <box height={1}>
+        <text>
+          <span fg={c.claude}>{"▜▛  "}</span>
+          <span fg={c.fgDim}>{"Opus 4.7 (1M context) · /Users/jane/code/web-app"}</span>
+        </text>
+      </box>
+      <box height={1}>
+        <text fg={c.fgDim}>{`    ${summary}`}</text>
+      </box>
     </box>
   )
 }
@@ -153,7 +159,7 @@ export function App() {
                   <text fg={c.fgDim}>{`… ${rg.foldedCount} more`}</text>
                 </box>
               ) : null}
-              <box height={1} />
+              <box height={1}><text> </text></box>
             </box>
           )
         })}
