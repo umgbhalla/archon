@@ -1,0 +1,29 @@
+{
+  "name": "archon",
+  "version": "0.1.0",
+  "description": "ACP-based multi-agent orchestrator CLI/TUI (foundation)",
+  "module": "src/cli.ts",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "archon": "src/cli.ts"
+  },
+  "scripts": {
+    "start": "bun run src/cli.ts",
+    "typecheck": "bunx tsc --noEmit",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "@types/react": "^19"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@opentui/core": "^0.3.2",
+    "@opentui/react": "^0.3.2",
+    "@zed-industries/agent-client-protocol": "^0.4.5",
+    "react": "^19"
+  }
+}
