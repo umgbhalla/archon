@@ -2,20 +2,28 @@
 /**
  * archon CLI (Claude-Code-like).
  *
- *   archon                          -> prints help (TUI comes in Breadth)
+ *   archon                          -> opens the TUI (interactive) / prints help (piped)
  *   archon -p "<prompt>" [flags]    -> run ONE prompt headless, stream assistant text
+ *   archon daemon                   -> run the persistent supervisor daemon (foreground)
+ *   archon daemon stop              -> stop the running daemon
+ *   archon daemon status            -> report whether a daemon is running
  *   archon agents                   -> list registered agents (alias: agents list)
  *   archon agents add <name> -- <argv...>  -> register an agent in config
  *   archon agents remove <name>     -> unregister a config agent
- *   archon ls [--json]              -> list sessions (in-process; see note)
- *   archon attach <id>             -> attach to a running session (in-process note)
+ *   archon ls [--json]              -> list sessions (live, via the daemon)
+ *   archon attach <id>             -> attach to a running session (streams updates)
  *   archon stop <id>               -> stop/cancel a running session
- *   archon logs <id>               -> print a session's accumulated transcript
+ *   archon logs <id>               -> print a session's persisted transcript
  *   archon --version
  *   archon --help
  *
+ * Sessions are owned by a per-user supervisor daemon (ADR-0004): they survive
+ * across CLI/TUI invocations. The CLI auto-starts the daemon on demand and falls
+ * back to an in-process manager when a socket can't be used (e.g. tests).
+ *
  * Flags for -p: --agent <name> --acp-cmd "<argv>" --model <m> --cwd <path>
  *               --permission-mode <default|acceptEdits|plan|bypassPermissions>
+ *               --in-process (run headless without the daemon)
  * agents add flags: --project (write project .archon/settings.json instead of user)
  */
 import { resolve } from "node:path";
@@ -23,14 +31,15 @@ import { getConfig } from "./config/load.ts";
 import { addAgent, removeAgent } from "./config/agents.ts";
 import { PERMISSION_MODES } from "./config/types.ts";
 import { listAgents } from "./backend/registry.ts";
-import { SessionManager } from "./core/session-manager.ts";
 import type { PermissionMode } from "./backend/types.ts";
+import { connectDaemon, userConfigDir, type DaemonClient } from "./daemon/client.ts";
+import { runDaemon, readDaemonPid } from "./daemon/server.ts";
+import { daemonPaths } from "./daemon/persistence.ts";
 
 const VERSION = "0.1.0";
 
 interface ParsedArgs {
   command?: string;
-  /** Positional args after the subcommand (e.g. agent name + argv, session id). */
   rest: string[];
   prompt?: string;
   agent?: string;
@@ -40,6 +49,7 @@ interface ParsedArgs {
   permissionMode?: string;
   json: boolean;
   project: boolean;
+  inProcess: boolean;
   version: boolean;
   help: boolean;
 }
@@ -49,6 +59,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     rest: [],
     json: false,
     project: false,
+    inProcess: false,
     version: false,
     help: false,
   };
@@ -86,8 +97,10 @@ function parseArgs(argv: string[]): ParsedArgs {
       case "--project":
         out.project = true;
         break;
+      case "--in-process":
+        out.inProcess = true;
+        break;
       case "--":
-        // everything after `--` is a literal argv for `agents add`
         for (let j = i + 1; j < argv.length; j++) positional.push(argv[j]!);
         i = argv.length;
         break;
@@ -114,15 +127,18 @@ function parseArgs(argv: string[]): ParsedArgs {
 const HELP = `archon ${VERSION} — ACP multi-agent orchestrator
 
 USAGE
-  archon                          Open the orchestrator TUI (coming in Breadth; prints this for now)
+  archon                          Open the orchestrator TUI (interactive); prints this when piped
   archon -p "<prompt>" [flags]    Run one prompt headless against an agent, stream the reply
+  archon daemon                   Run the persistent supervisor daemon (foreground)
+  archon daemon stop              Stop the running daemon
+  archon daemon status            Report whether the daemon is running
   archon agents [list]            List registered agent backends
   archon agents add <name> -- <argv...>   Register a custom ACP agent in config
   archon agents remove <name>     Remove a config-registered agent
-  archon ls [--json]              List active sessions
-  archon attach <id>              Attach to a running session
+  archon ls [--json]              List active sessions (live, via the daemon)
+  archon attach <id>              Attach to a running session (streams updates)
   archon stop <id>                Stop / cancel a running session
-  archon logs <id>                Print a session's accumulated transcript
+  archon logs <id>                Print a session's persisted transcript
   archon --version                Print version
   archon --help                   Show this help
 
@@ -132,6 +148,7 @@ PROMPT FLAGS
   --model <id>              Model id (passed through where supported)
   --cwd <path>              Working directory for the session (default: process cwd)
   --permission-mode <mode>  ${PERMISSION_MODES.join(" | ")}
+  --in-process              Run headless without the daemon (one-shot, no persistence)
 
 AGENTS ADD FLAGS
   --project                 Write project (.archon/settings.json) instead of user (~/.archon)
@@ -139,12 +156,6 @@ AGENTS ADD FLAGS
 CONFIG (precedence: env > managed > project .archon/settings.json > user ~/.archon/settings.json)
   ARCHON_CONFIG_DIR  ARCHON_DEFAULT_AGENT  ARCHON_DEFAULT_MODEL  ARCHON_PERMISSION_MODE
 `;
-
-/** In-process v1 (ADR-0004): no daemon, so sessions don't persist across CLI invocations. */
-const DAEMON_NOTE =
-  "archon v1 runs an in-process supervisor (no daemon yet, ADR-0004): sessions live only " +
-  "for the duration of a single command, so there are no cross-invocation sessions to manage. " +
-  "This command is the stable shape the daemon will back in Breadth.";
 
 function isPermissionMode(v: string | undefined): v is PermissionMode {
   return v !== undefined && (PERMISSION_MODES as string[]).includes(v);
@@ -156,6 +167,7 @@ function tokenize(s: string): string[] {
   return m.map((t) => t.replace(/^["']|["']$/g, ""));
 }
 
+/** Run one prompt and exit. Uses the daemon by default; --in-process opts out. */
 async function runHeadlessPrompt(args: ParsedArgs): Promise<number> {
   const cwd = resolve(args.cwd ?? process.cwd());
   const config = await getConfig(cwd);
@@ -165,53 +177,82 @@ async function runHeadlessPrompt(args: ParsedArgs): Promise<number> {
     : config.permissionMode;
   const acpCmd = args.acpCmd ? tokenize(args.acpCmd) : undefined;
 
-  const manager = new SessionManager();
+  const client = await connectDaemon({ inProcess: args.inProcess });
+  let id: string | undefined;
   try {
-    const id = await manager.createSession({
+    id = await client.createSession({
       agent,
       cwd,
       acpCmd,
       permissionMode,
       configAgents: config.agents,
     });
-    manager.on(
-      "session_chunk",
-      (ev: { id: string; update: { kind: string; role?: string; text?: string } }) => {
-        if (
-          ev.id === id &&
-          ev.update.kind === "message_chunk" &&
-          ev.update.role === "assistant"
-        ) {
-          process.stdout.write(ev.update.text ?? "");
-        }
-      },
-    );
-    const { stopReason } = await manager.prompt(id, args.prompt!);
+    const { stopReason } = await client.prompt(id, args.prompt!, (ev) => {
+      if (ev.kind === "chunk" && ev.update.kind === "message_chunk" && ev.update.role === "assistant") {
+        process.stdout.write(ev.update.text);
+      }
+    });
     process.stdout.write("\n");
     if (process.env.ARCHON_DEBUG) {
       process.stderr.write(`[archon] stopReason=${stopReason} agent=${agent}\n`);
     }
     return stopReason === "refusal" ? 1 : 0;
   } finally {
-    await manager.dispose();
+    // In-process: tear the session down (one-shot). Daemon: leave it running but
+    // remove the headless one-shot session so `ls` stays meaningful.
+    try {
+      if (id) await client.stop(id, /* remove */ true);
+    } catch {
+      /* ignore */
+    }
+    client.close();
   }
 }
 
-/**
- * Launch the session-grid TUI (the fleet surface). Reads/subscribes to a live
- * SessionManager; dispatch input creates real sessions via the backend.
- *
- * Only meaningful with an interactive TTY. Callers gate on `process.stdout.isTTY`
- * so piped/headless invocations (and the e2e tests) keep their text behavior.
- */
+/** archon daemon [stop|status] */
+async function runDaemonCommand(args: ParsedArgs): Promise<number> {
+  const sub = args.rest[0];
+  const configDir = userConfigDir();
+
+  if (sub === "stop") {
+    try {
+      const client = await connectDaemon({ noAutoStart: true });
+      await client.shutdownDaemon();
+      client.close();
+      process.stdout.write("Stopped archon daemon.\n");
+      return 0;
+    } catch {
+      process.stdout.write("No archon daemon running.\n");
+      return 0;
+    }
+  }
+
+  if (sub === "status") {
+    const { socketPath } = daemonPaths(configDir);
+    try {
+      const client = await connectDaemon({ noAutoStart: true });
+      const hs = await client.handshake();
+      client.close();
+      process.stdout.write(`daemon running: pid ${hs.pid}, protocol ${hs.protocolVersion}\n  socket ${socketPath}\n`);
+      return 0;
+    } catch {
+      const pid = await readDaemonPid(configDir);
+      process.stdout.write(`daemon not reachable${pid ? ` (stale pid ${pid})` : ""}.\n  socket ${socketPath}\n`);
+      return 1;
+    }
+  }
+
+  // foreground daemon
+  await runDaemon(configDir);
+  return 0;
+}
+
 async function launchTui(args: ParsedArgs): Promise<number> {
   const cwd = resolve(args.cwd ?? process.cwd());
   const config = await getConfig(cwd);
   const agent = args.agent ?? config.defaultAgent;
   const { runTui } = await import("./tui/index.tsx");
   await runTui({ agent, cwd, configAgents: config.agents });
-  // runTui mounts the renderer and never returns until the app calls
-  // process.exit on quit; keep the process alive.
   await new Promise<void>(() => {});
   return 0;
 }
@@ -260,12 +301,10 @@ async function runAgentsCommand(args: ParsedArgs): Promise<number> {
     return 1;
   }
 
-  // Interactive `archon agents` (no subcommand, TTY, not --json) opens the TUI.
   if (!sub && !args.json && (process.stdout.isTTY || process.env.ARCHON_TUI === "1")) {
     return launchTui(args);
   }
 
-  // default / "list": print the merged registry.
   const config = await getConfig(cwd);
   const agents = listAgents(config.agents);
   if (args.json) {
@@ -281,27 +320,99 @@ async function runAgentsCommand(args: ParsedArgs): Promise<number> {
   return 0;
 }
 
-async function runLs(args: ParsedArgs): Promise<number> {
-  // In-process v1: no persistent daemon, so the live snapshot is always empty here.
-  const snapshot = { sessions: [] as unknown[] };
-  if (args.json) {
-    process.stdout.write(JSON.stringify(snapshot, null, 2) + "\n");
-    return 0;
+/** Connect to the daemon (auto-start), do something, then release the connection. */
+async function withDaemon<T>(fn: (c: DaemonClient) => Promise<T>): Promise<T> {
+  const client = await connectDaemon({});
+  try {
+    return await fn(client);
+  } finally {
+    client.close();
   }
-  process.stdout.write("No active sessions.\n");
-  process.stdout.write(`${DAEMON_NOTE}\n`);
-  return 0;
 }
 
-/** attach/stop/logs are thin wrappers; with no daemon they explain + exit non-zero. */
-function runSessionCommand(verb: string, args: ParsedArgs): number {
+async function runLs(args: ParsedArgs): Promise<number> {
+  return withDaemon(async (client) => {
+    const sessions = await client.listSessions();
+    if (args.json) {
+      process.stdout.write(JSON.stringify({ sessions }, null, 2) + "\n");
+      return 0;
+    }
+    if (sessions.length === 0) {
+      process.stdout.write("No active sessions.\n");
+      return 0;
+    }
+    for (const s of sessions) {
+      const msg = (s.lastMessage || s.lastStopReason || "—").replace(/\s+/g, " ").trim().slice(0, 60);
+      process.stdout.write(`${s.id.padEnd(20)} ${s.state.padEnd(10)} ${s.agent.padEnd(8)} ${msg}\n`);
+    }
+    return 0;
+  });
+}
+
+async function runAttach(args: ParsedArgs): Promise<number> {
   const id = args.rest[0];
   if (!id) {
-    process.stderr.write(`usage: archon ${verb} <id>\n`);
+    process.stderr.write("usage: archon attach <id>\n");
     return 2;
   }
-  process.stderr.write(`No running session "${id}".\n${DAEMON_NOTE}\n`);
-  return 1;
+  return withDaemon(async (client) => {
+    const sessions = await client.listSessions();
+    if (!sessions.some((s) => s.id === id)) {
+      process.stderr.write(`No running session "${id}".\n`);
+      return 1;
+    }
+    process.stdout.write(`Attached to ${id}. Streaming updates (Ctrl-C to detach)...\n`);
+    await client.attach((ev) => {
+      if (ev.type === "session_chunk" && ev.id === id) {
+        if (ev.update.kind === "message_chunk" && ev.update.role === "assistant") {
+          process.stdout.write(ev.update.text);
+        }
+      } else if (ev.type === "session_updated" && ev.session.id === id) {
+        process.stderr.write(`\n[${id}] state=${ev.session.state}\n`);
+      } else if (ev.type === "session_removed" && ev.id === id) {
+        process.stderr.write(`\n[${id}] removed\n`);
+      }
+    });
+    // stay attached until interrupted.
+    await new Promise<void>(() => {});
+    return 0;
+  });
+}
+
+async function runStop(args: ParsedArgs): Promise<number> {
+  const id = args.rest[0];
+  if (!id) {
+    process.stderr.write("usage: archon stop <id>\n");
+    return 2;
+  }
+  return withDaemon(async (client) => {
+    const sessions = await client.listSessions();
+    if (!sessions.some((s) => s.id === id)) {
+      process.stderr.write(`No running session "${id}".\n`);
+      return 1;
+    }
+    await client.stop(id, /* remove */ true);
+    process.stdout.write(`Stopped session ${id}.\n`);
+    return 0;
+  });
+}
+
+async function runLogs(args: ParsedArgs): Promise<number> {
+  const id = args.rest[0];
+  if (!id) {
+    process.stderr.write("usage: archon logs <id>\n");
+    return 2;
+  }
+  return withDaemon(async (client) => {
+    const { session, transcript } = await client.logs(id);
+    if (!session && !transcript) {
+      process.stderr.write(`No session "${id}".\n`);
+      return 1;
+    }
+    process.stdout.write(transcript);
+    if (!transcript.endsWith("\n")) process.stdout.write("\n");
+    return 0;
+  });
 }
 
 async function main(): Promise<number> {
@@ -323,24 +434,24 @@ async function main(): Promise<number> {
   }
 
   switch (args.command) {
+    case "daemon":
+      return runDaemonCommand(args);
     case "agents":
       return runAgentsCommand(args);
     case "ls":
       return runLs(args);
     case "attach":
-      return runSessionCommand("attach", args);
+      return runAttach(args);
     case "stop":
-      return runSessionCommand("stop", args);
+      return runStop(args);
     case "logs":
-      return runSessionCommand("logs", args);
+      return runLogs(args);
   }
 
   if (args.prompt !== undefined) {
     return runHeadlessPrompt(args);
   }
 
-  // Default (no args): open the session-grid TUI when interactive; otherwise
-  // (piped / headless) print help so scripts and tests get deterministic text.
   if (process.stdout.isTTY || process.env.ARCHON_TUI === "1") {
     return launchTui(args);
   }

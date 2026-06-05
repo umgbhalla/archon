@@ -15,7 +15,7 @@ It ships two surfaces:
   input to spawn new sessions, and an attached view that streams an agent's ACP
   updates live.
 
-Built with **Bun + TypeScript**. Strict typecheck, 50 unit/integration/e2e tests
+Built with **Bun + TypeScript**. Strict typecheck, 58 unit/integration/e2e tests
 green. The end-to-end path is exercised in CI against a bundled credential-free
 **fake ACP agent**; real agents (`claude`, `gemini`) are wired by their known
 spawn specs but require their binaries + credentials and are not run in CI.
@@ -33,11 +33,28 @@ straight from TypeScript via Bun.
 
 ```bash
 bunx tsc --noEmit   # typecheck (strict, clean)
-bun test            # 50 tests across 9 files
+bun test            # 58 tests across 10 files
 ```
 
-The `bin` is `archon` → `src/cli.ts`. The commands below use
-`bun run src/cli.ts …`; after a global link they are just `archon …`.
+### Run it as `archon` (global install)
+
+`package.json` declares a `bin` (`archon` → `src/cli.ts`, with a `#!/usr/bin/env bun`
+shebang). Link it once to get a global `archon` command backed by this checkout:
+
+```bash
+bun link            # from this directory: registers the package
+bun link archon     # adds the `archon` bin to your global bin (~/.bun/bin)
+# ensure ~/.bun/bin is on your PATH, then:
+archon --help
+archon -p "hello" --agent fake
+archon              # opens the fleet TUI in an interactive terminal
+```
+
+`bun link` symlinks back to this source tree, so edits take effect immediately —
+no rebuild. To remove it later: `bun unlink archon` (and `bun unlink` here).
+
+Everything below uses the linked `archon …` form; without a link the equivalent
+is `bun run src/cli.ts …`.
 
 ---
 
@@ -265,8 +282,9 @@ Relevant ADRs: 0001 (Bun/TS), 0002, 0003 (AgentBackend control plane), 0004
   isolation (real temp-repo integration test).
 - Fleet TUI mounts and renders against a live `SessionManager`; dispatch input
   and attached streaming view are wired to the backend.
-- Strict typecheck clean; 50 tests green (config 6 + agents 5 + transport 2 +
-  registry 8 + worktree 13 + session-manager/worktree 4 + tui 2 + cli 5 + e2e 5).
+- Strict typecheck clean; 58 tests green across 10 files (config, agents,
+  transport, registry incl. agent-startup-error cases, worktree, session-manager,
+  daemon, tui, cli, e2e).
 
 **Stubbed / not done yet**
 
@@ -284,7 +302,7 @@ Relevant ADRs: 0001 (Bun/TS), 0002, 0003 (AgentBackend control plane), 0004
 - **TUI is observe + dispatch + attach**; richer fleet operations (filter-to-
   waiting, review-before-merge with inline diff comments, the workflow
   run-inspector surface) are future work.
-- No published binary / global install yet — run via `bun run src/cli.ts`.
+- Distributed as source, not a prebuilt binary — install with `bun link` (see [Install](#install)) or run via `bun run src/cli.ts`.
 
 ---
 
@@ -293,7 +311,7 @@ Relevant ADRs: 0001 (Bun/TS), 0002, 0003 (AgentBackend control plane), 0004
 ```bash
 bun install
 bunx tsc --noEmit                                 # typecheck
-bun test                                          # 50 tests
+bun test                                          # 58 tests
 bun run src/cli.ts -p "hello" --agent fake        # headless e2e: "Hello from the fake ACP agent!"
 ARCHON_TUI=1 bun run src/cli.ts                   # force the fleet TUI
 bun run src/cli.ts agents --json                  # registry

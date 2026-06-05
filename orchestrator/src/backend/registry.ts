@@ -116,6 +116,9 @@ export function mergeRegistry(
       runnable: false,
       source: "config",
       notes: "Registered via ~/.archon/settings.json or .archon/settings.json (agents).",
+      setupHint:
+        `Ensure "${command[0]}" is installed and on PATH, and that the agent ` +
+        "speaks ACP over stdio. Check this agent's argv in your .archon/settings.json.",
     };
   }
   return merged;
@@ -212,5 +215,6 @@ export function createBackend(opts: CreateBackendOptions): AgentBackend {
     cwd: opts.cwd,
     env: Object.keys(env).length > 0 ? env : undefined,
     permissionMode: opts.permissionMode,
+    setupHint: spec.setupHint,
   });
 }

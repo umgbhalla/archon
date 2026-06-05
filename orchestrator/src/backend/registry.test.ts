@@ -73,3 +73,45 @@ test("createBackend resolves a config agent by name (skip launcher check)", () =
   });
   expect(be.name).toBe("mycustom");
 });
+
+test("AcpBackend.connect surfaces an actionable error when the agent exits during startup", async () => {
+  // /usr/bin/false exits immediately with no ACP handshake.
+  const be = createBackend({
+    agent: "generic",
+    acpCmd: ["sh", "-c", "echo BOOM_FROM_AGENT >&2; exit 3"],
+    skipLauncherCheck: true,
+  });
+  let msg = "";
+  try {
+    await be.connect();
+    throw new Error("expected connect() to reject");
+  } catch (e) {
+    msg = (e as Error).message;
+  } finally {
+    await be.dispose();
+  }
+  expect(msg).toMatch(/failed to start/);
+  expect(msg).toMatch(/exited \(code 3\)/);
+  // captured stderr tail is included so the user sees the real cause.
+  expect(msg).toMatch(/BOOM_FROM_AGENT/);
+  // generic's setup hint is appended.
+  expect(msg).toMatch(/hint:/);
+});
+
+test("AcpBackend.connect surfaces a clear error when the binary cannot be spawned", async () => {
+  const be = createBackend({
+    agent: "generic",
+    acpCmd: ["/nonexistent/path/to/agent-binary"],
+    skipLauncherCheck: true,
+  });
+  let msg = "";
+  try {
+    await be.connect();
+    throw new Error("expected connect() to reject");
+  } catch (e) {
+    msg = (e as Error).message;
+  } finally {
+    await be.dispose();
+  }
+  expect(msg).toMatch(/failed to start/);
+});

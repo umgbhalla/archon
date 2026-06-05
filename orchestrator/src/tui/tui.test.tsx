@@ -133,3 +133,150 @@ test("attach shows the fullscreen view; detach returns to the grid", async () =>
   await settle(setup, () => setup.captureCharFrame().includes("Completed"));
   expect(setup.captureCharFrame()).toContain("Completed");
 });
+
+// ── store unit tests (pure, no renderer) ──────────────────────────────────────
+import {
+  applyFilter,
+  initialUiState,
+  reducer,
+  selectedSelectable,
+} from "./store.ts";
+import { HELP_SECTIONS } from "./keymap.ts";
+import type { SessionSnapshot } from "../core/session-manager.ts";
+
+function snap(id: string, state: SessionSnapshot["state"]): SessionSnapshot {
+  const now = Date.now();
+  return { id, agent: "fake", cwd: "/tmp", state, lastMessage: "", createdAt: now, updatedAt: now };
+}
+
+test("applyFilter keeps only waiting sessions when filterWaiting is on", () => {
+  const sessions = [snap("a", "completed"), snap("b", "waiting"), snap("c", "busy")];
+  expect(applyFilter(sessions, false)).toHaveLength(3);
+  const filtered = applyFilter(sessions, true);
+  expect(filtered).toHaveLength(1);
+  expect(filtered[0]!.id).toBe("b");
+});
+
+test("toggleFilter flips filterWaiting and clears a pending delete-arm", () => {
+  let s = initialUiState();
+  s = reducer(s, { type: "stopArm", id: "x" });
+  expect(s.deleteArmedId).toBe("x");
+  s = reducer(s, { type: "toggleFilter" });
+  expect(s.filterWaiting).toBe(true);
+  expect(s.deleteArmedId).toBeNull();
+  s = reducer(s, { type: "toggleFilter" });
+  expect(s.filterWaiting).toBe(false);
+});
+
+test("toggleHelp round-trips and remembers the mode it overlaid", () => {
+  let s = initialUiState();
+  s = { ...s, mode: "attached", attachedId: "z" };
+  s = reducer(s, { type: "toggleHelp" });
+  expect(s.mode).toBe("help");
+  expect(s.helpReturnMode).toBe("attached");
+  s = reducer(s, { type: "toggleHelp" });
+  expect(s.mode).toBe("attached");
+});
+
+test("stopArm then reconcileSelection disarms when the armed session vanishes", () => {
+  const before = [snap("a", "completed"), snap("b", "stopped")];
+  let s = initialUiState();
+  s = reducer(s, { type: "stopArm", id: "b" });
+  // session b removed → reconcile should disarm
+  s = reducer(s, { type: "reconcileSelection", sessions: [snap("a", "completed")] });
+  expect(s.deleteArmedId).toBeNull();
+});
+
+test("HELP_SECTIONS is non-empty and documents the core fleet keys", () => {
+  const flat = HELP_SECTIONS.flatMap((sec) => sec.rows.map((r) => `${r.keys} ${r.action}`)).join(" | ");
+  expect(HELP_SECTIONS.length).toBeGreaterThan(0);
+  expect(flat).toContain("Ctrl+X");
+  expect(flat.toLowerCase()).toContain("need input");
+  expect(flat).toContain("?");
+});
+
+// ── interaction tests (renderer) ──────────────────────────────────────────────
+
+async function dispatchOne(setup: Setup, text: string): Promise<void> {
+  await act(async () => {
+    await setup.mockInput.typeText(text);
+  });
+  await settle(setup, () => setup.captureCharFrame().includes(text));
+  await act(async () => {
+    await setup.mockInput.pressKeys(["RETURN"]);
+  });
+}
+
+test("? opens the help overlay and Esc dismisses it", async () => {
+  const manager = new SessionManager();
+  live = manager;
+  const setup = await mount(manager);
+
+  await act(async () => {
+    await setup.mockInput.typeText("?");
+  });
+  const shown = await settle(setup, () => setup.captureCharFrame().includes("Keyboard shortcuts"));
+  expect(shown).toBe(true);
+  const help = setup.captureCharFrame();
+  expect(help).toContain("Keyboard shortcuts");
+  expect(help).toContain("Ctrl+X");
+
+  await act(async () => {
+    await setup.mockInput.pressKeys(["ESCAPE"]);
+  });
+  const closed = await settle(setup, () => !setup.captureCharFrame().includes("Keyboard shortcuts"));
+  expect(closed).toBe(true);
+});
+
+test("w toggles the needs-input filter badge", async () => {
+  const manager = new SessionManager();
+  live = manager;
+  const setup = await mount(manager);
+
+  await act(async () => {
+    await setup.mockInput.typeText("w");
+  });
+  const on = await settle(setup, () => setup.captureCharFrame().includes("filter: needs-input"));
+  expect(on).toBe(true);
+  // empty filtered grid copy
+  expect(setup.captureCharFrame()).toContain("No sessions need input");
+
+  await act(async () => {
+    await setup.mockInput.typeText("w");
+  });
+  const off = await settle(setup, () => !setup.captureCharFrame().includes("filter: needs-input"));
+  expect(off).toBe(true);
+});
+
+test("Ctrl+X arms a delete on a selected session, second Ctrl+X removes it", async () => {
+  const manager = new SessionManager();
+  live = manager;
+  const setup = await mount(manager);
+
+  await dispatchOne(setup, "hi");
+  const created = await settle(setup, () => manager.snapshot().sessions[0]?.state === "completed");
+  expect(created).toBe(true);
+
+  // move onto the row (past the group header), let selection commit.
+  await act(async () => {
+    await setup.mockInput.pressKeys(["ARROW_DOWN"]);
+  });
+  for (let i = 0; i < 4; i++) await step(setup);
+
+  const id = manager.snapshot().sessions[0]!.id;
+
+  // first Ctrl+X → stop + arm
+  await act(async () => {
+    setup.mockInput.pressKey("x", { ctrl: true });
+  });
+  const armed = await settle(setup, () => setup.captureCharFrame().includes("again within 2s to"));
+  expect(armed).toBe(true);
+
+  // second Ctrl+X → delete (manager loses the session)
+  await act(async () => {
+    setup.mockInput.pressKey("x", { ctrl: true });
+  });
+  const gone = await settle(setup, () => !manager.snapshot().sessions.some((s) => s.id === id));
+  expect(gone).toBe(true);
+  expect(manager.snapshot().sessions).toHaveLength(0);
+});

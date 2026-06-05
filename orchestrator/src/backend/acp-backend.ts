@@ -108,6 +108,8 @@ export interface AcpBackendOptions {
   cwd?: string;
   env?: Record<string, string>;
   permissionMode?: PermissionMode;
+  /** Human-facing install/auth hint, appended to startup-failure errors. */
+  setupHint?: string;
 }
 
 export class AcpBackend implements AgentBackend {
@@ -151,7 +153,7 @@ export class AcpBackend implements AgentBackend {
           if (opt) return { outcome: { outcome: "selected", optionId: opt.optionId } };
         }
         // default / plan: allow non-destructive once if offered, else cancel and let
-        // a human decide (the TUI in Breadth will surface this instead).
+        // a human decide (the TUI surfaces the resulting "waiting" state).
         if (allow) return { outcome: { outcome: "selected", optionId: allow.optionId } };
         return { outcome: { outcome: "cancelled" } };
       },
@@ -175,17 +177,47 @@ export class AcpBackend implements AgentBackend {
 
   async connect(): Promise<void> {
     if (this.connected) return;
-    this.agentProc = spawnAcpAgent(
-      { command: this.opts.command, cwd: this.opts.cwd, env: this.opts.env },
-      this.makeClient,
-    );
-    const res = await this.agentProc.connection.initialize({
+    let proc: AgentProcess;
+    try {
+      proc = spawnAcpAgent(
+        { command: this.opts.command, cwd: this.opts.cwd, env: this.opts.env },
+        this.makeClient,
+      );
+    } catch (err) {
+      // spawn() itself failed (e.g. ENOENT for a binary not on PATH).
+      throw new Error(this.startupError(`could not start "${this.opts.command[0]}": ${(err as Error).message}`));
+    }
+    this.agentProc = proc;
+
+    // Race the ACP handshake against the process dying. A crash during startup
+    // (bad/missing auth, npx install failure, wrong binary) otherwise hangs the
+    // handshake forever or surfaces a cryptic stream error; we want a clear,
+    // actionable message instead.
+    const earlyExit = proc.exited.then((code) => {
+      throw new Error(this.startupError(`agent process exited (code ${code}) during startup`));
+    });
+    const handshake = proc.connection.initialize({
       protocolVersion: PROTOCOL_VERSION,
       clientCapabilities: {
         fs: { readTextFile: true, writeTextFile: true },
         terminal: false,
       },
     });
+    let res: Awaited<typeof handshake>;
+    try {
+      res = await Promise.race([handshake, earlyExit]);
+    } catch (err) {
+      proc.kill();
+      this.connected = false;
+      // If we already produced a startupError, pass it through; otherwise wrap the
+      // raw handshake error (with any captured stderr) into an actionable message.
+      const msg = (err as Error).message;
+      throw new Error(
+        msg.startsWith(`agent "${this.name}"`) ? msg : this.startupError(`handshake failed: ${msg}`),
+      );
+    }
+    // swallow the now-irrelevant earlyExit rejection so it doesn't go unhandled.
+    earlyExit.catch(() => {});
     const caps = res.agentCapabilities;
     this.capabilities = {
       loadSession: caps?.loadSession ?? false,
@@ -244,6 +276,18 @@ export class AcpBackend implements AgentBackend {
     this.sessionQueues.clear();
     this.agentProc?.kill();
     this.connected = false;
+  }
+
+  /** Compose an actionable startup-failure message (cause + stderr tail + hint). */
+  private startupError(cause: string): string {
+    const parts = [`agent "${this.name}" failed to start: ${cause}.`];
+    const tail = this.agentProc?.stderr();
+    if (tail) {
+      const lines = tail.split("\n").slice(-6).join("\n");
+      parts.push(`\n  --- agent stderr ---\n${lines}`);
+    }
+    if (this.opts.setupHint) parts.push(`\n  hint: ${this.opts.setupHint}`);
+    return parts.join("");
   }
 
   private assertConnected(): void {

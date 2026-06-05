@@ -6,15 +6,16 @@
  * REAL SessionManager snapshot, fed in from React state. This store owns only
  * *UI* state: current mode, selection (tracked by stable session id, not index,
  * per the mock's keepSelection pattern), the dispatch input buffer, the attach
- * input buffer, and a transient HUD/status line.
+ * input buffer, a transient HUD/status line, a filter-to-waiting toggle, and the
+ * delete-arm window (Ctrl+X twice to delete).
  *
  * Selectables (headers + rows) are derived from the live snapshot via
- * buildSelectables(snapshot), so selection survives regroup/add/remove.
+ * buildSelectables(snapshot, filter), so selection survives regroup/add/remove.
  */
 import type { SessionSnapshot } from "../core/session-manager.ts";
 import { GROUP_ORDER, GROUP_TITLES, groupForState, type SessionGroup } from "./theme.ts";
 
-export type UiMode = "grid" | "attached";
+export type UiMode = "grid" | "attached" | "help";
 
 export type SelectableKind = "header" | "row";
 export interface Selectable {
@@ -44,6 +45,15 @@ export interface UiState {
   attachedId: string | null;
   /** Transient status/HUD line. */
   hud: string;
+  /** When true, only needs-input (waiting) sessions are shown ("which agent needs me?"). */
+  filterWaiting: boolean;
+  /**
+   * Session id armed for deletion. First Ctrl+X stops + arms; a second Ctrl+X
+   * within the arm window (host timer) deletes; Esc / timeout disarms.
+   */
+  deleteArmedId: string | null;
+  /** The mode to return to when help is dismissed (help overlays grid or attached). */
+  helpReturnMode: UiMode;
   /** Set true to signal the host to tear down + exit. */
   exited: boolean;
 }
@@ -56,17 +66,30 @@ export function initialUiState(): UiState {
     attachInput: "",
     attachedId: null,
     hud: "ready",
+    filterWaiting: false,
+    deleteArmedId: null,
+    helpReturnMode: "grid",
     exited: false,
   };
 }
 
 // ── Derivation from the live snapshot ─────────────────────────────────────────
 
+/** Apply the filter-to-waiting toggle to a raw session list. */
+export function applyFilter(sessions: SessionSnapshot[], filterWaiting: boolean): SessionSnapshot[] {
+  if (!filterWaiting) return sessions;
+  return sessions.filter((s) => s.state === "waiting");
+}
+
 /** Group + order the live sessions into render groups (empty groups dropped). */
-export function buildRenderGroups(sessions: SessionSnapshot[]): RenderGroup[] {
+export function buildRenderGroups(
+  sessions: SessionSnapshot[],
+  filterWaiting = false,
+): RenderGroup[] {
+  const src = applyFilter(sessions, filterWaiting);
   const out: RenderGroup[] = [];
   for (const group of GROUP_ORDER) {
-    const rows = sessions
+    const rows = src
       .filter((s) => groupForState(s.state) === group)
       .sort((a, b) => b.updatedAt - a.updatedAt);
     if (rows.length > 0) out.push({ group, title: GROUP_TITLES[group], rows });
@@ -75,9 +98,12 @@ export function buildRenderGroups(sessions: SessionSnapshot[]): RenderGroup[] {
 }
 
 /** Flatten render groups into a navigable list of selectables (header, rows...). */
-export function buildSelectables(sessions: SessionSnapshot[]): Selectable[] {
+export function buildSelectables(
+  sessions: SessionSnapshot[],
+  filterWaiting = false,
+): Selectable[] {
   const out: Selectable[] = [];
-  for (const rg of buildRenderGroups(sessions)) {
+  for (const rg of buildRenderGroups(sessions, filterWaiting)) {
     out.push({ kind: "header", group: rg.group });
     for (const row of rg.rows) {
       out.push({ kind: "row", group: rg.group, sessionId: row.id });
@@ -94,7 +120,7 @@ export function selectedSelectable(
   state: UiState,
   sessions: SessionSnapshot[],
 ): Selectable | undefined {
-  const list = buildSelectables(sessions);
+  const list = buildSelectables(sessions, state.filterWaiting);
   if (list.length === 0) return undefined;
   const found = state.selectionKey
     ? list.find((s) => keyForSelectable(s) === state.selectionKey)
@@ -126,12 +152,16 @@ export type UiAction =
   | { type: "attachBackspace" }
   | { type: "attachClear" }
   | { type: "setHud"; hud: string }
+  | { type: "toggleFilter" }
+  | { type: "toggleHelp" }
+  | { type: "stopArm"; id: string }
+  | { type: "disarmDelete" }
   // The host clamps/repairs the selection after the snapshot changes.
   | { type: "reconcileSelection"; sessions: SessionSnapshot[] };
 
 /** Move selection by delta within the derived selectable list, by stable key. */
 function move(state: UiState, sessions: SessionSnapshot[], delta: number): UiState {
-  const list = buildSelectables(sessions);
+  const list = buildSelectables(sessions, state.filterWaiting);
   if (list.length === 0) return state;
   const cur = selectedSelectable(state, sessions);
   const idx = cur ? list.findIndex((s) => keyForSelectable(s) === keyForSelectable(cur)) : 0;
@@ -154,6 +184,7 @@ export function reducer(state: UiState, action: UiAction): UiState {
         mode: "attached",
         attachedId: sess.id,
         attachInput: "",
+        deleteArmedId: null,
         hud: `attached ${sess.id}`,
       };
     }
@@ -162,7 +193,9 @@ export function reducer(state: UiState, action: UiAction): UiState {
       return { ...state, mode: "grid", attachedId: null, attachInput: "" };
 
     case "back":
-      // Esc on the grid with empty dispatch exits; otherwise clear input/detach.
+      // help -> return to underlying mode; attached -> grid; grid w/ input -> clear; else exit.
+      if (state.mode === "help") return { ...state, mode: state.helpReturnMode };
+      if (state.deleteArmedId) return { ...state, deleteArmedId: null, hud: "delete disarmed" };
       if (state.mode === "attached") return { ...state, mode: "grid", attachedId: null, attachInput: "" };
       if (state.dispatch.length > 0) return { ...state, dispatch: "" };
       return { ...state, exited: true };
@@ -187,13 +220,31 @@ export function reducer(state: UiState, action: UiAction): UiState {
     case "setHud":
       return { ...state, hud: action.hud };
 
+    case "toggleFilter":
+      return { ...state, filterWaiting: !state.filterWaiting, deleteArmedId: null };
+
+    case "toggleHelp":
+      if (state.mode === "help") return { ...state, mode: state.helpReturnMode };
+      return { ...state, mode: "help", helpReturnMode: state.mode };
+
+    case "stopArm":
+      return { ...state, deleteArmedId: action.id };
+
+    case "disarmDelete":
+      return { ...state, deleteArmedId: null };
+
     case "reconcileSelection": {
-      const list = buildSelectables(action.sessions);
-      if (list.length === 0) return { ...state, selectionKey: null };
-      const stillThere = state.selectionKey && list.some((s) => keyForSelectable(s) === state.selectionKey);
-      if (stillThere) return state;
+      const list = buildSelectables(action.sessions, state.filterWaiting);
+      // If a delete-armed session vanished from the snapshot, disarm.
+      const armedGone =
+        state.deleteArmedId != null &&
+        !action.sessions.some((s) => s.id === state.deleteArmedId);
+      const base = armedGone ? { ...state, deleteArmedId: null } : state;
+      if (list.length === 0) return { ...base, selectionKey: null };
+      const stillThere = base.selectionKey && list.some((s) => keyForSelectable(s) === base.selectionKey);
+      if (stillThere) return base;
       const first = list[0];
-      return first ? { ...state, selectionKey: keyForSelectable(first) } : state;
+      return first ? { ...base, selectionKey: keyForSelectable(first) } : base;
     }
   }
 }

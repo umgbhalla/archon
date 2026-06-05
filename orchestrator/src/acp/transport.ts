@@ -24,6 +24,11 @@ export interface AgentProcess {
   proc: Subprocess<"pipe", "pipe", "pipe">;
   /** Resolves with the process exit code. */
   exited: Promise<number>;
+  /**
+   * Most recent stderr output from the agent (tail, trimmed). Useful for building
+   * an actionable error when the agent crashes during startup (auth/install issues).
+   */
+  stderr(): string;
   /** Kill the subprocess. */
   kill(): void;
 }
@@ -35,14 +40,29 @@ export interface AgentProcess {
 function sinkToWritable(stdin: import("bun").FileSink): WritableStream<Uint8Array> {
   return new WritableStream<Uint8Array>({
     write(chunk) {
-      stdin.write(chunk);
-      void stdin.flush();
+      // Writing to a dead agent's stdin throws EPIPE; swallow it here. The real,
+      // actionable failure is surfaced via the process's early exit in connect(),
+      // so we don't want the raw EPIPE stack leaking to the user's terminal.
+      try {
+        stdin.write(chunk);
+        void stdin.flush();
+      } catch {
+        /* broken pipe / agent gone */
+      }
     },
     close() {
-      void stdin.end();
+      try {
+        void stdin.end();
+      } catch {
+        /* already closed */
+      }
     },
     abort() {
-      void stdin.end();
+      try {
+        void stdin.end();
+      } catch {
+        /* already closed */
+      }
     },
   });
 }
@@ -70,6 +90,21 @@ export function spawnAcpAgent(
   const input: ReadableStream<Uint8Array> = proc.stdout;
   const output: WritableStream<Uint8Array> = sinkToWritable(proc.stdin);
 
+  // Drain stderr into a bounded ring buffer so a startup crash (bad auth, npx
+  // failure, missing module) can be surfaced in an actionable error.
+  let stderrTail = "";
+  const STDERR_CAP = 4000;
+  void (async () => {
+    try {
+      const decoder = new TextDecoder();
+      for await (const chunk of proc.stderr as ReadableStream<Uint8Array>) {
+        stderrTail = (stderrTail + decoder.decode(chunk, { stream: true })).slice(-STDERR_CAP);
+      }
+    } catch {
+      /* stderr closed / process gone */
+    }
+  })();
+
   const stream = ndJsonStream(output, input);
   const connection = new ClientSideConnection(toClient, stream);
 
@@ -77,6 +112,7 @@ export function spawnAcpAgent(
     connection,
     proc,
     exited: proc.exited,
+    stderr: () => stderrTail.trim(),
     kill() {
       try {
         proc.kill();

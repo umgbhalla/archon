@@ -3,6 +3,9 @@ import { createBackend } from "./backend/registry.ts";
 import { SessionManager } from "./core/session-manager.ts";
 import { FAKE_REPLY } from "./testing/fake-acp-agent.ts";
 import type { AgentUpdateEvent } from "./backend/types.ts";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const CLI = new URL("./cli.ts", import.meta.url).pathname;
 
@@ -47,9 +50,14 @@ test("e2e: SessionManager tracks state busy -> completed and emits chunk events"
 });
 
 test("e2e: CLI headless `-p` path streams the assistant text to stdout", async () => {
-  const proc = Bun.spawn(["bun", "run", CLI, "-p", "hello", "--agent", "fake"], {
+  // --in-process keeps this hermetic: exercises the headless streaming path
+  // without spawning a daemon; an isolated ARCHON_CONFIG_DIR keeps persistence
+  // out of the real ~/.archon.
+  const cfg = mkdtempSync(join(tmpdir(), "archon-e2e-"));
+  const proc = Bun.spawn(["bun", "run", CLI, "-p", "hello", "--agent", "fake", "--in-process"], {
     stdout: "pipe",
     stderr: "pipe",
+    env: { ...process.env, ARCHON_CONFIG_DIR: cfg },
   });
   const out = await new Response(proc.stdout).text();
   const code = await proc.exited;
