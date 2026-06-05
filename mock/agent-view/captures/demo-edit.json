@@ -1,0 +1,21 @@
+{
+  "clips": [
+    { "from": "01-table",        "to": "02-dispatch",     "caption": "Agent View — background sessions grouped by state" },
+    { "from": "02-dispatch",     "to": "03-tooshort",     "caption": "Dispatch a session: type a task, Enter" },
+    { "from": "03-tooshort",     "to": "04-filter",       "caption": "Prompts under 4 chars are rejected (Too short)" },
+    { "from": "04-filter",       "to": "05-peek",         "caption": "Filter the list — s:working", "hold_ms": 900 },
+    { "from": "05-peek",         "to": "06-question",     "caption": "Peek a session (Space) — recent output" },
+    { "from": "06-question",     "to": "07-answered",     "caption": "Peek a blocked session — numbered options", "hold_ms": 1300 },
+    { "from": "07-answered",     "to": "08-attached",     "caption": "Answer with a number key" },
+    { "from": "08-attached",     "to": "09-help",         "caption": "Attach (Enter / Right) — the inbuilt session terminal", "hold_ms": 1600 },
+    { "from": "09-help",         "to": "10-groupdir",     "caption": "All keyboard shortcuts (?)", "hold_ms": 1200 },
+    { "from": "10-groupdir",     "to": "11-pin",          "caption": "Group by directory (Ctrl+S)" },
+    { "from": "11-pin",          "to": "12-rename-edit",  "caption": "Pin a session (Ctrl+T)" },
+    { "from": "12-rename-edit",  "to": "13-renamed",      "caption": "Rename inline (Ctrl+R)", "hold_ms": 900 },
+    { "from": "13-renamed",      "to": "14-delete-armed", "caption": "Delete: Ctrl+X stops & arms a 2-second confirm", "hold_ms": 1700 },
+    { "from": "14-delete-armed", "to": "15-deleted",      "caption": "Ctrl+X again within 2s — row + worktree removed" },
+    { "from": "15-deleted",      "to": "16-scenario",     "caption": "Session deleted" },
+    { "from": "16-scenario",     "to": "17-narrow",       "caption": "Step the scripted scenario (n)" },
+    { "from": "17-narrow",       "to": "18-wide",         "caption": "Responsive — reflows to a narrow terminal", "hold_ms": 1300 }
+  ]
+}

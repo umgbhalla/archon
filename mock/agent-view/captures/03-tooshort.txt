@@ -1,7 +1,7 @@
 
   ▟▙  Claude Code v2.1.140
   ▜▛  Opus 4.7 (1M context) · /Users/jane/code/web-app
-      2 awaiting input · 4 working · 4 completed
+      2 awaiting input · 5 working · 4 completed
 
   Pinned
     ✽ clawd walk cycle         Write assets/sprites/clawd-walk.png                                       3
@@ -19,6 +19,7 @@
     ✽ collision detection      Edit src/physics/CollisionSystem.ts                                       2
     ✽ tileset import           2/5 importing biome tilesets                                             30
     ✢ playtest level 3         run 12 · all checkpoints cleared                                       in 4
+    ✽ investigate the flaky c… investigate the flaky checkout test                                      no
 
   Completed
     ∙ water shader             error: GLSL compile failed (line 42)                                      1
@@ -32,9 +33,8 @@
 
 
 
-
   ────────────────────────────────────────────────────────────────────────────────────────────────────────
-  ❯ describe a task for a new session
+  ❯ ab
   ────────────────────────────────────────────────────────────────────────────────────────────────────────
   enter to open · space to reply · ctrl+x to delete · n next scenario · ? for shortcuts
-  hud ready · press n to advance scenario · ? for shortcuts  (0/10)
+  hud Too short — describe a task in at least 4 chars  (0/10)

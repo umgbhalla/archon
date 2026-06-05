@@ -1,24 +1,24 @@
 
   ▟▙  Claude Code v2.1.140
   ▜▛  Opus 4.7 (1M context) · /Users/jane/code/web-app
-      2 awaiting input · 4 working · 4 completed
+      1 awaiting input · 7 working · 4 completed
 
   Pinned
     ✽ clawd walk cycle         Write assets/sprites/clawd-walk.png                                       3
     ✻ design doc keeper        Idle — ready for your next prompt                                        22
+    ✻ leaderboard backend      needs input: allow writing .env.production?                               4
 
   Ready for review
     ∙ jump physics             Opened PR with collision fix                                 PR #2048    2h
     ∙ checkpoint save system   3 PRs open — save/load, autosave, slot UI                    PR #2051    5h
 
-  Needs input
-    ✻ power-up design          needs input: double jump or wall climb?                                   1
-    ✻ leaderboard backend      needs input: allow writing .env.production?                               4
-
   Working
+    ✽ power-up design          needs input: double jump or wall climb?                                   1
     ✽ collision detection      Edit src/physics/CollisionSystem.ts                                       2
     ✽ tileset import           2/5 importing biome tilesets                                             30
     ✢ playtest level 3         run 12 · all checkpoints cleared                                       in 4
+    ✽ investigate the flaky c… investigate the flaky checkout test                                      no
+    ✽ ✦ triaged                ✦ triaged                                                                no
 
   Completed
     ∙ water shader             error: GLSL compile failed (line 42)                                      1
@@ -37,4 +37,4 @@
   ❯ describe a task for a new session
   ────────────────────────────────────────────────────────────────────────────────────────────────────────
   enter to open · space to reply · ctrl+x to delete · n next scenario · ? for shortcuts
-  hud ready · press n to advance scenario · ? for shortcuts  (0/10)
+  hud dispatched "✦ triaged"  (0/10)

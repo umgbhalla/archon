@@ -1,0 +1,40 @@
+
+  ▟▙  Claude Code v2.1.140
+  ▜▛  Opus 4.7 (1M context) · /Users/jane/code/web-app
+      1 awaiting input · 6 working · 4 completed
+
+  ╭──────────────────────────────────────────────────────────────────────╮
+  │                                                                      │                               3
+  │ ⚠ stopped · press Ctrl+X again within 2s to delete                   │                              22
+  │ target: "clawd walk cycle"                                           │                               4
+  │ █████████████████████████░░░  1.8s                                   │
+  │ ⚠ removes the row and its worktree, incl. uncommitted changes        │
+  │ (use claude rm from the shell to keep the dirty worktree)            │                  PR #2048    2h
+  │ esc to keep (stays stopped) · auto-disarms in 2s                     │                  PR #2051    5h
+  │                                                                      │
+  ╰──────────────────────────────────────────────────────────────────────╯
+    ✽ power-up design          needs input: double jump or wall climb?                                   1
+    ✽ collision detection      Edit src/physics/CollisionSystem.ts                                       2
+    ✽ tileset import           2/5 importing biome tilesets                                             30
+    ✢ playtest level 3         run 12 · all checkpoints cleared                                       in 4
+    ✽ investigate the flaky c… investigate the flaky checkout test                                      no
+    ✽ ✦ triaged                ✦ triaged                                                                no
+
+  Completed
+    ∙ water shader             error: GLSL compile failed (line 42)                                      1
+    ✻ title screen             result: menu, options, and credits done                                   9
+    … 2 more
+
+
+
+
+
+
+
+
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ❯ describe a task for a new session
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────
+  enter to open · space to reply · ctrl+x to delete · n next scenario · ? for shortcuts
+  hud stopped · Ctrl+X again within 2s to delete  (0/10)

@@ -1,0 +1,40 @@
+
+  ▟▙  Claude Code v2.1.140
+  ▜▛  Opus 4.7 (1M context) · /Users/jane/code/web-app
+      1 awaiting input · 6 working · 4 completed
+
+  Pinned
+    ✽╭─Keyboard shortcuts─────────────────────────────────────────────────────────────────────────────╮  3
+    ✻│                                                                                                │ 22
+     │  Navigate                                                                                      │
+  Rea│    ↑ / ↓               Move between rows                                                       │
+    ∙│    Shift+↑ / Shift+↓   Reorder the selected session                                            │ 2h
+    ∙│    Enter               Attach to the selected session, or dispatch if there's text in the inp  │ 5h
+     │    →                   Attach to the selected session                                          │
+  Nee│    Alt+1 .. Alt+9      Attach to session 1–9 in the focused session's directory                │
+    ✻│                                                                                                │  4
+     │  Dispatch & peek                                                                               │
+  Wor│    Space               Open or close the peek panel for the selected session                   │
+    ✽│    Shift+Enter         Dispatch and attach immediately                                         │  1
+    ✽│    Tab                 On empty input, browse all subagents; otherwise apply the suggestion    │  2
+    ✽│    Ctrl+G              Open the dispatch prompt in your $VISUAL or $EDITOR                     │ 30
+    ✢│                                                                                                │n 4
+    ✽│  Manage sessions                                                                               │ no
+     │    Ctrl+S              Switch grouping between state and directory                             │
+  Com│    Ctrl+T              Pin or unpin the selected session                                       │
+    ∙│    Ctrl+R              Rename the selected session                                             │  1
+    ✻│    Ctrl+X              Stop the session; press again within two seconds to delete it           │  9
+    …│                                                                                                │
+     │  Dismiss                                                                                       │
+     │    Esc                 Close the peek panel, clear the input, or exit                          │
+     │    Ctrl+C              Clear the input; press twice to exit                                    │
+     │    ?                   Show all shortcuts                                                      │
+     │                                                                                                │
+     │                                                                                                │
+     ╰───────────────────────────────────────esc or ? to close────────────────────────────────────────╯
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ❯ describe a task for a new session
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────
+  enter to open · space to reply · ctrl+x to delete · n next scenario · ? for shortcuts
+  hud picked option 1 for "power-up design"  (0/10)
