@@ -92,6 +92,27 @@ export function isFilterText(text: string): boolean {
   return false
 }
 
+/** Does a session match the active filter text (a:<name>, s:<state>, #<n>, PR url)? */
+export function matchesFilter(sess: Session, text: string): boolean {
+  const t = text.trim().toLowerCase()
+  if (t.startsWith("a:")) {
+    const n = t.slice(2).trim()
+    return n.length === 0 || sess.agent.toLowerCase().includes(n)
+  }
+  if (t.startsWith("s:")) {
+    const q = t.slice(2).trim()
+    if (q === "blocked") return sess.state === "needsInput"
+    return sess.state.toLowerCase() === q
+  }
+  if (t.startsWith("#")) {
+    const n = Number(t.slice(1))
+    return !Number.isNaN(n) && sess.pr?.number === n
+  }
+  const m = t.match(/\/pull\/(\d+)/)
+  if (m) return sess.pr?.number === Number(m[1])
+  return true
+}
+
 // ───────────────────── Part A: session lifecycle reducer ─────────────────────
 
 export type SessionEvent =
@@ -201,8 +222,13 @@ export interface RenderGroup {
 
 export function buildRenderGroups(state: AppState): RenderGroup[] {
   const groups: RenderGroup[] = []
+  // Apply the active filter (a:/s:/#/PR) to the visible set (U3) before grouping.
+  const active =
+    state.input.isFilter && state.input.text.trim().length > 0
+      ? state.sessions.filter((s) => matchesFilter(s, state.input.text))
+      : state.sessions
   for (const g of GROUP_ORDER) {
-    const inGroup = state.sessions.filter((s) => resolveGroup(s) === g)
+    const inGroup = active.filter((s) => resolveGroup(s) === g)
     if (inGroup.length === 0) continue
     const collapsed = state.collapsedGroups.includes(g)
     let rows = inGroup
