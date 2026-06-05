@@ -1,9 +1,10 @@
 # ADR-0008: Keyboard-first input; selection-by-stable-key
 
-- **Status:** proposed
+- **Status:** accepted (implemented)
 - **Date:** 2026-06-05
 - **Deciders:** archon
 - **Tier:** 1 surfaces
+- **Implementation:** `orchestrator/src/tui/keymap.ts` (single-source-of-truth bindings, the ? overlay is generated from it) + `orchestrator/src/tui/store.ts` (selection tracked by stable session id, not index).
 
 ## Context
 Terminal orchestrators are keyboard-driven. The mock surfaced concrete pitfalls: selection

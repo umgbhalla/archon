@@ -1,9 +1,10 @@
 # ADR-0004: Persistent supervisor daemon; the TUI is a thin observer
 
-- **Status:** accepted
+- **Status:** accepted (implemented)
 - **Date:** 2026-06-05
 - **Deciders:** archon
 - **Tier:** 0 foundational
+- **Implementation:** `orchestrator/src/daemon/` — per-user supervisor over a 0600 unix socket (`server.ts`, `protocol.ts`), start-on-demand + reconnect client (`client.ts`), JSON-file persistence + roster recovery on restart (`persistence.ts`, ADR-0011). CLI: `archon daemon [stop|status]`, `ls`, `attach`, `stop`, `logs`. Verified: a session survives a full daemon stop/start (roster + transcript recovered).
 
 ## Context
 

@@ -1,9 +1,10 @@
 # ADR-0006: Session state model → dual-channel glyph
 
-- **Status:** proposed
+- **Status:** accepted (implemented)
 - **Date:** 2026-06-05
 - **Deciders:** archon
 - **Tier:** 1 surfaces
+- **Implementation:** `orchestrator/src/core/session-manager.ts` (logical states busy|waiting|idle|completed|failed|stopped) + `orchestrator/src/tui/theme.ts` (dual-channel glyph: color=state, shape=liveness).
 
 ## Context
 The single highest-value glance primitive is "does it need me? is it even running?".

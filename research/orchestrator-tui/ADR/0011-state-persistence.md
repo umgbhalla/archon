@@ -1,9 +1,10 @@
 # ADR-0011: Persistence → Git for code state, SQLite for metadata
 
-- **Status:** proposed
+- **Status:** accepted (JSON-files variant implemented; SQLite deferred)
 - **Date:** 2026-06-05
 - **Deciders:** archon
 - **Tier:** 2 execution
+- **Implementation:** `orchestrator/src/daemon/persistence.ts` — `FilePersistence` (roster.json index + per-session meta.json + append-only transcript.log, atomic tmp+rename). SQLite/relational store remains the eventual target behind the same `Persistence` interface.
 
 ## Context
 The daemon (ADR-0004) must persist sessions, runs, and journals across restarts/sleep.

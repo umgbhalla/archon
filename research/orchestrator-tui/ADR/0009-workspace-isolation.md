@@ -1,9 +1,10 @@
 # ADR-0009: Workspace isolation → git-worktree default, pluggable
 
-- **Status:** proposed
+- **Status:** accepted (implemented)
 - **Date:** 2026-06-05
 - **Deciders:** archon
 - **Tier:** 2 execution
+- **Implementation:** `orchestrator/src/core/worktree.ts` — lazy, per-session linked git worktree created before the first edit; opt-out via `worktree.bgIsolation: "none"`; skipped outside a git repo. Real temp-repo integration test.
 
 ## Context
 Parallel agents editing the same checkout collide. Isolation is table stakes; options trade
